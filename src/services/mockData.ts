@@ -1,241 +1,429 @@
+import { Student, Class, Teacher, TeacherClass, Expense, Course, School, StatisticsData } from '../types';
 
-import { Student, Class, Teacher, TeacherClass, Expense, Course, School, StatisticsData } from "../types";
-import { v4 as uuidv4 } from "uuid";
-
-// Mock schools and departments data
-export const schools: School[] = [
-  {
-    id: "1",
-    name: "Πανεπιστήμιο Αθηνών",
-    departments: [
-      {
-        id: "1-1",
-        name: "Πληροφορικής & Τηλεπικοινωνιών",
-        courses: [
-          { id: "c1", school: "Πανεπιστήμιο Αθηνών", department: "Πληροφορικής & Τηλεπικοινωνιών", name: "Αλγόριθμοι" },
-          { id: "c2", school: "Πανεπιστήμιο Αθηνών", department: "Πληροφορικής & Τηλεπικοινωνιών", name: "Δομές Δεδομένων" },
-          { id: "c3", school: "Πανεπιστήμιο Αθηνών", department: "Πληροφορικής & Τηλεπικοινωνιών", name: "Βάσεις Δεδομένων" }
-        ]
-      },
-      {
-        id: "1-2",
-        name: "Οικονομικών Επιστημών",
-        courses: [
-          { id: "c4", school: "Πανεπιστήμιο Αθηνών", department: "Οικονομικών Επιστημών", name: "Μικροοικονομία" },
-          { id: "c5", school: "Πανεπιστήμιο Αθηνών", department: "Οικονομικών Επιστημών", name: "Μακροοικονομία" }
-        ]
-      }
-    ]
-  },
-  {
-    id: "2",
-    name: "Εθνικό Μετσόβιο Πολυτεχνείο",
-    departments: [
-      {
-        id: "2-1",
-        name: "Ηλεκτρολόγων Μηχανικών",
-        courses: [
-          { id: "c6", school: "Εθνικό Μετσόβιο Πολυτεχνείο", department: "Ηλεκτρολόγων Μηχανικών", name: "Ηλεκτροτεχνία" },
-          { id: "c7", school: "Εθνικό Μετσόβιο Πολυτεχνείο", department: "Ηλεκτρολόγων Μηχανικών", name: "Ηλεκτρονική" }
-        ]
-      },
-      {
-        id: "2-2",
-        name: "Μηχανολόγων Μηχανικών",
-        courses: [
-          { id: "c8", school: "Εθνικό Μετσόβιο Πολυτεχνείο", department: "Μηχανολόγων Μηχανικών", name: "Μηχανική Ρευστών" },
-          { id: "c9", school: "Εθνικό Μετσόβιο Πολυτεχνείο", department: "Μηχανολόγων Μηχανικών", name: "Θερμοδυναμική" }
-        ]
-      }
-    ]
+// Helper function to initialize local storage with mock data
+export const initializeLocalStorage = () => {
+  if (!localStorage.getItem('students')) {
+    localStorage.setItem('students', JSON.stringify([]));
   }
-];
+  if (!localStorage.getItem('classes')) {
+    localStorage.setItem('classes', JSON.stringify([]));
+  }
+  if (!localStorage.getItem('teachers')) {
+    localStorage.setItem('teachers', JSON.stringify([]));
+  }
+  if (!localStorage.getItem('teacherClasses')) {
+    localStorage.setItem('teacherClasses', JSON.stringify([]));
+  }
+  if (!localStorage.getItem('expenses')) {
+    localStorage.setItem('expenses', JSON.stringify([]));
+  }
+  if (!localStorage.getItem('schools')) {
+    localStorage.setItem('schools', JSON.stringify([]));
+  }
+   if (!localStorage.getItem('courses')) {
+    localStorage.setItem('courses', JSON.stringify([]));
+  }
+  if (!localStorage.getItem('statisticsData')) {
+    localStorage.setItem('statisticsData', JSON.stringify({
+      studentsCount: {
+        total: 0,
+        bySchool: {}
+      },
+      revenue: {
+        daily: 0,
+        monthly: 0,
+        yearly: 0
+      },
+      expenses: {
+        daily: 0,
+        monthly: 0,
+        yearly: 0
+      },
+      studentBalances: 0,
+      teacherBalances: 0
+    }));
+  }
+};
 
-// Extract all courses from schools
-export const courses: Course[] = schools.flatMap(school => 
-  school.departments.flatMap(dept => dept.courses)
-);
+// Helper function to save data to local storage
+export const saveToLocalStorage = (key: string, data: any) => {
+  localStorage.setItem(key, JSON.stringify(data));
+};
+
+// Helper function to get data from local storage
+export const getFromLocalStorage = <T>(key: string, defaultValue: T): T => {
+  const storedData = localStorage.getItem(key);
+  return storedData ? JSON.parse(storedData) : defaultValue;
+};
 
 // Mock students data
 export const students: Student[] = [
   {
-    id: uuidv4(),
+    id: "student-1",
     lastName: "Παπαδόπουλος",
-    firstName: "Γιάννης",
-    school: "Πανεπιστήμιο Αθηνών",
-    department: "Πληροφορικής & Τηλεπικοινωνιών",
+    firstName: "Γιώργος",
+    school: "ΕΚΠΑ",
+    department: "Πληροφορικής",
     phone: "6912345678",
-    email: "gpapadopoulos@example.com",
-    interestedCourses: ["Αλγόριθμοι", "Δομές Δεδομένων"],
-    createdAt: new Date(2023, 8, 15)
+    email: "george.papadopoulos@example.com",
+    interestedCourses: ["Μαθηματικά Ι", "Προγραμματισμός"],
+    createdAt: new Date()
   },
   {
-    id: uuidv4(),
-    lastName: "Κωνσταντίνου",
+    id: "student-2",
+    lastName: "Ιωάννου",
     firstName: "Μαρία",
-    school: "Εθνικό Μετσόβιο Πολυτεχνείο",
-    department: "Ηλεκτρολόγων Μηχανικών",
+    school: "ΑΠΘ",
+    department: "Ιατρικής",
     phone: "6987654321",
-    email: "mkonstantinou@example.com",
-    interestedCourses: ["Ηλεκτροτεχνία"],
-    createdAt: new Date(2023, 9, 3)
+    email: "maria.ioannou@example.com",
+    interestedCourses: ["Βιολογία", "Χημεία"],
+    createdAt: new Date()
   },
   {
-    id: uuidv4(),
-    lastName: "Αντωνίου",
-    firstName: "Κώστας",
-    school: "Πανεπιστήμιο Αθηνών",
-    department: "Οικονομικών Επιστημών",
-    phone: "6955554444",
-    email: "kantoniou@example.com",
-    interestedCourses: ["Μικροοικονομία", "Μακροοικονομία"],
-    createdAt: new Date(2023, 10, 10)
+    id: "student-3",
+    lastName: "Δημητρίου",
+    firstName: "Κωνσταντίνος",
+    school: "ΠΑΔΑ",
+    department: "Μηχανολογίας",
+    phone: "6955555555",
+    email: "konstantinos.dimitriou@example.com",
+    interestedCourses: ["Μαθηματικά ΙΙ", "Φυσική Ι"],
+    createdAt: new Date()
   }
 ];
 
 // Mock classes data
 export const classes: Class[] = [
   {
-    id: uuidv4(),
-    studentId: students[0].id,
-    studentName: `${students[0].lastName} ${students[0].firstName}`,
-    school: students[0].school,
-    department: students[0].department,
-    course: "Αλγόριθμοι",
-    date: new Date(2023, 11, 5),
+    id: "class-1",
+    studentId: "student-1",
+    studentName: "Παπαδόπουλος Γιώργος",
+    school: "ΕΚΠΑ",
+    department: "Πληροφορικής",
+    course: "Μαθηματικά Ι",
+    date: new Date(2023, 5, 10),
     hours: 2,
     ratePerHour: 25,
     total: 50,
     paymentStatus: "paid",
-    paymentDate: new Date(2023, 11, 5),
+    paymentDate: new Date(2023, 5, 10),
     amountPaid: 50,
     balance: 0,
-    paymentMethod: "Μετρητά"
+    paymentMethod: "cash"
   },
   {
-    id: uuidv4(),
-    studentId: students[1].id,
-    studentName: `${students[1].lastName} ${students[1].firstName}`,
-    school: students[1].school,
-    department: students[1].department,
-    course: "Ηλεκτροτεχνία",
-    date: new Date(2023, 11, 6),
+    id: "class-2",
+    studentId: "student-2",
+    studentName: "Ιωάννου Μαρία",
+    school: "ΑΠΘ",
+    department: "Ιατρικής",
+    course: "Βιολογία",
+    date: new Date(2023, 5, 12),
     hours: 3,
     ratePerHour: 30,
     total: 90,
-    paymentStatus: "partial",
-    paymentDate: new Date(2023, 11, 6),
-    amountPaid: 50,
-    balance: 40,
-    paymentMethod: "Κάρτα"
-  },
-  {
-    id: uuidv4(),
-    studentId: students[2].id,
-    studentName: `${students[2].lastName} ${students[2].firstName}`,
-    school: students[2].school,
-    department: students[2].department,
-    course: "Μικροοικονομία",
-    date: new Date(2023, 11, 7),
-    hours: 2,
-    ratePerHour: 25,
-    total: 50,
     paymentStatus: "pending",
     amountPaid: 0,
-    balance: 50
+    balance: 90
+  },
+  {
+    id: "class-3",
+    studentId: "student-3",
+    studentName: "Δημητρίου Κωνσταντίνος",
+    school: "ΠΑΔΑ",
+    department: "Μηχανολογίας",
+    course: "Φυσική Ι",
+    date: new Date(2023, 5, 15),
+    hours: 4,
+    ratePerHour: 20,
+    total: 80,
+    paymentStatus: "partial",
+    paymentDate: new Date(2023, 5, 15),
+    amountPaid: 40,
+    balance: 40,
+    paymentMethod: "card"
   }
 ];
 
-// Mock teachers data
+// Mock teachers data with baseSalary and studentBonus
 export const teachers: Teacher[] = [
   {
-    id: uuidv4(),
-    lastName: "Δημητρίου",
-    firstName: "Νίκος",
-    courses: ["Αλγόριθμοι", "Δομές Δεδομένων"],
-    contact: "6911223344"
-  },
-  {
-    id: uuidv4(),
-    lastName: "Γεωργίου",
-    firstName: "Ελένη",
-    courses: ["Ηλεκτροτεχνία", "Ηλεκτρονική"],
-    contact: "6933445566"
-  },
-  {
-    id: uuidv4(),
+    id: "teacher-1",
     lastName: "Αλεξίου",
+    firstName: "Κώστας",
+    courses: ["Μαθηματικά Ι", "Μαθηματικά ΙΙ", "Στατιστική"],
+    contact: "6944123456",
+    baseSalary: 16,
+    studentBonus: 1
+  },
+  {
+    id: "teacher-2",
+    lastName: "Παπαδοπούλου",
+    firstName: "Ελένη",
+    courses: ["Φυσική Ι", "Φυσική ΙΙ"],
+    contact: "6977654321",
+    baseSalary: 17,
+    studentBonus: 1.5
+  },
+  {
+    id: "teacher-3",
+    lastName: "Γεωργίου",
     firstName: "Δημήτρης",
-    courses: ["Μικροοικονομία", "Μακροοικονομία"],
-    contact: "6922334455"
+    courses: ["Προγραμματισμός", "Βάσεις Δεδομένων", "Αλγόριθμοι"],
+    contact: "6955678901",
+    baseSalary: 18,
+    studentBonus: 2
   }
 ];
 
-// Mock teacher classes data
+// Teacher classes with studentsCount field
 export const teacherClasses: TeacherClass[] = [
   {
-    id: uuidv4(),
-    teacherId: teachers[0].id,
-    teacherName: `${teachers[0].lastName} ${teachers[0].firstName}`,
-    course: "Αλγόριθμοι",
-    date: new Date(2023, 11, 5),
+    id: "teacher-class-1",
+    teacherId: "teacher-1",
+    teacherName: "Αλεξίου Κώστας",
+    course: "Μαθηματικά Ι",
+    date: new Date(2023, 5, 15),
     hours: 2,
-    ratePerHour: 15,
-    totalDue: 30,
-    amountPaid: 30,
-    balance: 0
+    studentsCount: 5, // Added studentsCount field
+    ratePerHour: 21,   // 16 + 1 * 5
+    totalDue: 42,
+    amountPaid: 42,
+    balance: 0,
+    calculationMethod: "formula"
   },
   {
-    id: uuidv4(),
-    teacherId: teachers[1].id,
-    teacherName: `${teachers[1].lastName} ${teachers[1].firstName}`,
-    course: "Ηλεκτροτεχνία",
-    date: new Date(2023, 11, 6),
+    id: "teacher-class-2",
+    teacherId: "teacher-2",
+    teacherName: "Παπαδοπούλου Ελένη",
+    course: "Φυσική Ι",
+    date: new Date(2023, 5, 16),
     hours: 3,
-    ratePerHour: 18,
-    totalDue: 54,
-    amountPaid: 40,
-    balance: 14
+    studentsCount: 4, // Added studentsCount field
+    ratePerHour: 23,   // 17 + 1.5 * 4
+    totalDue: 69,
+    amountPaid: 0,
+    balance: 69,
+    calculationMethod: "formula"
   },
   {
-    id: uuidv4(),
-    teacherId: teachers[2].id,
-    teacherName: `${teachers[2].lastName} ${teachers[2].firstName}`,
-    course: "Μικροοικονομία",
-    date: new Date(2023, 11, 7),
-    hours: 2,
-    ratePerHour: 17,
-    totalDue: 34,
-    amountPaid: 0,
-    balance: 34
+    id: "teacher-class-3",
+    teacherId: "teacher-3",
+    teacherName: "Γεωργίου Δημήτρης",
+    course: "Προγραμματισμός",
+    date: new Date(2023, 5, 17),
+    hours: 4,
+    studentsCount: 3, // Added studentsCount field
+    ratePerHour: 24,   // 18 + 2 * 3
+    totalDue: 96,
+    amountPaid: 50,
+    balance: 46,
+    calculationMethod: "formula"
   }
 ];
 
 // Mock expenses data
 export const expenses: Expense[] = [
   {
-    id: uuidv4(),
-    date: new Date(2023, 11, 1),
-    description: "Ενοίκιο Δεκεμβρίου",
+    id: "expense-1",
+    date: new Date(2023, 5, 5),
+    description: "Ενοίκιο γραφείου",
     category: "Ενοίκιο",
-    amount: 800,
-    paymentMethod: "Τραπεζική Μεταφορά"
+    amount: 500,
+    paymentMethod: "transfer"
   },
   {
-    id: uuidv4(),
-    date: new Date(2023, 11, 3),
-    description: "Λογαριασμός ΔΕΗ",
-    category: "Λογαριασμοί",
-    amount: 150,
-    paymentMethod: "Τραπεζική Μεταφορά"
-  },
-  {
-    id: uuidv4(),
-    date: new Date(2023, 11, 5),
-    description: "Γραφική Ύλη",
+    id: "expense-2",
+    date: new Date(2023, 5, 7),
+    description: "Αγορά γραφικής ύλης",
     category: "Υλικά",
-    amount: 85,
-    paymentMethod: "Μετρητά"
+    amount: 50,
+    paymentMethod: "card"
+  },
+  {
+    id: "expense-3",
+    date: new Date(2023, 5, 9),
+    description: "Διαφήμιση στο διαδίκτυο",
+    category: "Διαφήμιση",
+    amount: 200,
+    paymentMethod: "card"
+  }
+];
+
+// Mock courses data
+export const courses: Course[] = [
+  {
+    id: "course-1",
+    school: "ΕΚΠΑ",
+    department: "Πληροφορικής",
+    name: "Μαθηματικά Ι"
+  },
+  {
+    id: "course-2",
+    school: "ΑΠΘ",
+    department: "Ιατρικής",
+    name: "Βιολογία"
+  },
+  {
+    id: "course-3",
+    school: "ΠΑΔΑ",
+    department: "Μηχανολογίας",
+    name: "Φυσική Ι"
+  },
+  {
+    id: "course-4",
+    school: "ΕΚΠΑ",
+    department: "Πληροφορικής",
+    name: "Μαθηματικά ΙΙ"
+  },
+  {
+    id: "course-5",
+    school: "ΑΠΘ",
+    department: "Ιατρικής",
+    name: "Χημεία"
+  },
+  {
+    id: "course-6",
+    school: "ΠΑΔΑ",
+    department: "Μηχανολογίας",
+    name: "Μαθηματικά ΙΙ"
+  },
+  {
+    id: "course-7",
+    school: "ΕΚΠΑ",
+    department: "Πληροφορικής",
+    name: "Στατιστική"
+  },
+  {
+    id: "course-8",
+    school: "ΠΑΔΑ",
+    department: "Μηχανολογίας",
+    name: "Αντοχή Υλικών"
+  },
+  {
+    id: "course-9",
+    school: "ΕΚΠΑ",
+    department: "Πληροφορικής",
+    name: "Προγραμματισμός"
+  },
+    {
+    id: "course-10",
+    school: "ΕΚΠΑ",
+    department: "Πληροφορικής",
+    name: "Βάσεις Δεδομένων"
+  },
+  {
+    id: "course-11",
+    school: "ΕΚΠΑ",
+    department: "Πληροφορικής",
+    name: "Αλγόριθμοι"
+  }
+];
+
+// Mock schools data
+export const schools: School[] = [
+  {
+    id: "school-1",
+    name: "ΕΚΠΑ",
+    departments: [
+      {
+        id: "department-1",
+        name: "Πληροφορικής",
+        courses: [
+          {
+            id: "course-1",
+            school: "ΕΚΠΑ",
+            department: "Πληροφορικής",
+            name: "Μαθηματικά Ι"
+          },
+          {
+            id: "course-4",
+            school: "ΕΚΠΑ",
+            department: "Πληροφορικής",
+            name: "Μαθηματικά ΙΙ"
+          },
+          {
+            id: "course-7",
+            school: "ΕΚΠΑ",
+            department: "Πληροφορικής",
+            name: "Στατιστική"
+          },
+           {
+            id: "course-9",
+            school: "ΕΚΠΑ",
+            department: "Πληροφορικής",
+            name: "Προγραμματισμός"
+          },
+          {
+            id: "course-10",
+            school: "ΕΚΠΑ",
+            department: "Πληροφορικής",
+            name: "Βάσεις Δεδομένων"
+          },
+          {
+            id: "course-11",
+            school: "ΕΚΠΑ",
+            department: "Πληροφορικής",
+            name: "Αλγόριθμοι"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    id: "school-2",
+    name: "ΑΠΘ",
+    departments: [
+      {
+        id: "department-2",
+        name: "Ιατρικής",
+        courses: [
+          {
+            id: "course-2",
+            school: "ΑΠΘ",
+            department: "Ιατρικής",
+            name: "Βιολογία"
+          },
+          {
+            id: "course-5",
+            school: "ΑΠΘ",
+            department: "Ιατρικής",
+            name: "Χημεία"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    id: "school-3",
+    name: "ΠΑΔΑ",
+    departments: [
+      {
+        id: "department-3",
+        name: "Μηχανολογίας",
+        courses: [
+          {
+            id: "course-3",
+            school: "ΠΑΔΑ",
+            department: "Μηχανολογίας",
+            name: "Φυσική Ι"
+          },
+          {
+            id: "course-6",
+            school: "ΠΑΔΑ",
+            department: "Μηχανολογίας",
+            name: "Μαθηματικά ΙΙ"
+          },
+          {
+            id: "course-8",
+            school: "ΠΑΔΑ",
+            department: "Μηχανολογίας",
+            name: "Αντοχή Υλικών"
+          }
+        ]
+      }
+    ]
   }
 ];
 
@@ -244,64 +432,21 @@ export const statisticsData: StatisticsData = {
   studentsCount: {
     total: students.length,
     bySchool: {
-      "Πανεπιστήμιο Αθηνών": 2,
-      "Εθνικό Μετσόβιο Πολυτεχνείο": 1
+      "ΕΚΠΑ": 1,
+      "ΑΠΘ": 1,
+      "ΠΑΔΑ": 1
     }
   },
   revenue: {
-    daily: 50,
-    monthly: 450,
-    yearly: 5400
+    daily: 100,
+    monthly: 1000,
+    yearly: 12000
   },
   expenses: {
-    daily: 35,
-    monthly: 1035,
-    yearly: 12420
+    daily: 50,
+    monthly: 500,
+    yearly: 6000
   },
-  studentBalances: 90,
-  teacherBalances: 48
-};
-
-// Local storage service to mimic a database
-export const saveToLocalStorage = <T>(key: string, data: T): void => {
-  try {
-    localStorage.setItem(key, JSON.stringify(data));
-  } catch (error) {
-    console.error(`Error saving to localStorage: ${error}`);
-  }
-};
-
-export const getFromLocalStorage = <T>(key: string, defaultValue: T): T => {
-  try {
-    const storedData = localStorage.getItem(key);
-    return storedData ? (JSON.parse(storedData) as T) : defaultValue;
-  } catch (error) {
-    console.error(`Error reading from localStorage: ${error}`);
-    return defaultValue;
-  }
-};
-
-// Initialize local storage with mock data
-export const initializeLocalStorage = (): void => {
-  if (!localStorage.getItem('students')) {
-    saveToLocalStorage('students', students);
-  }
-  if (!localStorage.getItem('classes')) {
-    saveToLocalStorage('classes', classes);
-  }
-  if (!localStorage.getItem('teachers')) {
-    saveToLocalStorage('teachers', teachers);
-  }
-  if (!localStorage.getItem('teacherClasses')) {
-    saveToLocalStorage('teacherClasses', teacherClasses);
-  }
-  if (!localStorage.getItem('expenses')) {
-    saveToLocalStorage('expenses', expenses);
-  }
-  if (!localStorage.getItem('schools')) {
-    saveToLocalStorage('schools', schools);
-  }
-  if (!localStorage.getItem('courses')) {
-    saveToLocalStorage('courses', courses);
-  }
+  studentBalances: 500,
+  teacherBalances: 1000
 };

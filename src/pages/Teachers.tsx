@@ -49,6 +49,12 @@ const formSchema = z.object({
   courses: z.array(z.string()).min(1, {
     message: "Επιλέξτε τουλάχιστον ένα μάθημα.",
   }),
+  baseSalary: z.coerce.number().min(0, {
+    message: "Ο βασικός μισθός πρέπει να είναι θετικός αριθμός.",
+  }).default(16),
+  studentBonus: z.coerce.number().min(0, {
+    message: "Το επίδομα ανά φοιτητή πρέπει να είναι θετικός αριθμός.",
+  }).default(1),
 });
 
 const Teachers = () => {
@@ -78,6 +84,8 @@ const Teachers = () => {
       firstName: "",
       contact: "",
       courses: [],
+      baseSalary: 16,
+      studentBonus: 1,
     },
   });
 
@@ -89,6 +97,8 @@ const Teachers = () => {
       firstName: "",
       contact: "",
       courses: [],
+      baseSalary: 16,
+      studentBonus: 1,
     },
   });
 
@@ -117,6 +127,8 @@ const Teachers = () => {
       firstName: teacher.firstName,
       contact: teacher.contact,
       courses: teacher.courses,
+      baseSalary: teacher.baseSalary || 16,
+      studentBonus: teacher.studentBonus || 1,
     });
     
     setIsEditDialogOpen(true);
@@ -163,6 +175,20 @@ const Teachers = () => {
             {coursesList.join(", ")}
           </div>
         );
+      },
+    },
+    {
+      accessorKey: "baseSalary",
+      header: "Βασικός Μισθός (X)",
+      cell: ({ row }: any) => {
+        return `${row.getValue("baseSalary") || 16}€`;
+      },
+    },
+    {
+      accessorKey: "studentBonus",
+      header: "Επίδομα/Φοιτητή (Y)",
+      cell: ({ row }: any) => {
+        return `${row.getValue("studentBonus") || 1}€`;
       },
     },
     {
@@ -270,6 +296,46 @@ const Teachers = () => {
                   </FormItem>
                 )}
               />
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <FormField
+                  control={addForm.control}
+                  name="baseSalary"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Βασικός Μισθός (X) €/ώρα</FormLabel>
+                      <FormControl>
+                        <Input 
+                          type="number" 
+                          min="0" 
+                          step="0.5"
+                          {...field} 
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={addForm.control}
+                  name="studentBonus"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Επίδομα ανά Φοιτητή (Y) €</FormLabel>
+                      <FormControl>
+                        <Input 
+                          type="number" 
+                          min="0" 
+                          step="0.5"
+                          {...field} 
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
 
               <FormField
                 control={addForm.control}
@@ -387,6 +453,46 @@ const Teachers = () => {
                   </FormItem>
                 )}
               />
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <FormField
+                  control={editForm.control}
+                  name="baseSalary"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Βασικός Μισθός (X) €/ώρα</FormLabel>
+                      <FormControl>
+                        <Input 
+                          type="number" 
+                          min="0" 
+                          step="0.5"
+                          {...field} 
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={editForm.control}
+                  name="studentBonus"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Επίδομα ανά Φοιτητή (Y) €</FormLabel>
+                      <FormControl>
+                        <Input 
+                          type="number" 
+                          min="0" 
+                          step="0.5"
+                          {...field} 
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
 
               <FormField
                 control={editForm.control}

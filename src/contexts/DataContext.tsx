@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import { 
@@ -55,6 +54,7 @@ interface DataContextType {
   deleteCourse: (id: string) => void;
   uploadCourses: (csvData: string) => void;
   refreshStatistics: () => void;
+  calculateTeacherRate: (teacherId: string, studentsCount: number) => number;
 }
 
 const DataContext = createContext<DataContextType | undefined>(undefined);
@@ -69,7 +69,6 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [courses, setCourses] = useState<Course[]>([]);
   const [statisticsData, setStatisticsData] = useState<StatisticsData>(initialStatisticsData);
 
-  // Initialize data from local storage or mock data
   useEffect(() => {
     initializeLocalStorage();
     setStudents(getFromLocalStorage('students', initialStudents));
@@ -82,26 +81,22 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     refreshStatistics();
   }, []);
 
-  // Calculate statistics based on current data
   const refreshStatistics = () => {
     const storedStudents = getFromLocalStorage('students', initialStudents);
     const storedClasses = getFromLocalStorage('classes', initialClasses);
     const storedExpenses = getFromLocalStorage('expenses', initialExpenses);
     const storedTeacherClasses = getFromLocalStorage('teacherClasses', initialTeacherClasses);
 
-    // Count students by school
     const schoolCounts: Record<string, number> = {};
     storedStudents.forEach(student => {
       schoolCounts[student.school] = (schoolCounts[student.school] || 0) + 1;
     });
 
-    // Calculate financial metrics
     const now = new Date();
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
     const firstDayOfYear = new Date(now.getFullYear(), 0, 1);
 
-    // Revenue calculations
     const dailyRevenue = storedClasses
       .filter(c => new Date(c.date).getTime() >= today.getTime())
       .reduce((sum, c) => sum + c.amountPaid, 0);
@@ -114,7 +109,6 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       .filter(c => new Date(c.date).getTime() >= firstDayOfYear.getTime())
       .reduce((sum, c) => sum + c.amountPaid, 0);
 
-    // Expense calculations
     const dailyExpenses = storedExpenses
       .filter(e => new Date(e.date).getTime() >= today.getTime())
       .reduce((sum, e) => sum + e.amount, 0);
@@ -127,7 +121,6 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       .filter(e => new Date(e.date).getTime() >= firstDayOfYear.getTime())
       .reduce((sum, e) => sum + e.amount, 0);
 
-    // Balances
     const studentBalances = storedClasses.reduce((sum, c) => sum + c.balance, 0);
     const teacherBalances = storedTeacherClasses.reduce((sum, tc) => sum + tc.balance, 0);
 
@@ -154,7 +147,16 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     saveToLocalStorage('statisticsData', newStatistics);
   };
 
-  // Student CRUD operations
+  const calculateTeacherRate = (teacherId: string, studentsCount: number) => {
+    const teacher = teachers.find(t => t.id === teacherId);
+    if (!teacher) return 25;
+    
+    const baseSalary = teacher.baseSalary || 16;
+    const studentBonus = teacher.studentBonus || 1;
+    
+    return baseSalary + (studentBonus * studentsCount);
+  };
+
   const addStudent = (student: Omit<Student, 'id' | 'createdAt'>) => {
     const newStudent: Student = {
       ...student,
@@ -186,7 +188,6 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     refreshStatistics();
   };
 
-  // Class CRUD operations
   const addClass = (classItem: Omit<Class, 'id' | 'total' | 'balance'>) => {
     const total = classItem.hours * classItem.ratePerHour;
     const balance = total - classItem.amountPaid;
@@ -208,7 +209,6 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (classItem.id === id) {
         const updatedItem = { ...classItem, ...classData };
         
-        // Recalculate total and balance if necessary fields changed
         if (classData.hours !== undefined || classData.ratePerHour !== undefined) {
           updatedItem.total = (classData.hours || classItem.hours) * (classData.ratePerHour || classItem.ratePerHour);
         }
@@ -236,11 +236,12 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     refreshStatistics();
   };
 
-  // Teacher CRUD operations
   const addTeacher = (teacher: Omit<Teacher, 'id'>) => {
     const newTeacher: Teacher = {
       ...teacher,
-      id: uuidv4()
+      id: uuidv4(),
+      baseSalary: teacher.baseSalary || 16,
+      studentBonus: teacher.studentBonus || 1
     };
     const updatedTeachers = [...teachers, newTeacher];
     setTeachers(updatedTeachers);
@@ -264,16 +265,22 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     toast.success('Ο καθηγητής διαγράφηκε');
   };
 
-  // Teacher Class CRUD operations
-  const addTeacherClass = (teacherClass: Omit<TeacherClass, 'id' | 'totalDue' | 'balance'>) => {
-    const totalDue = teacherClass.hours * teacherClass.ratePerHour;
+  const addTeacherClass = (teacherClass: Omit<TeacherClass, 'id' | 'totalDue' | 'balance' | 'ratePerHour'>) => {
+    const ratePerHour = teacherClass.calculationMethod === 'formula' 
+      ? calculateTeacherRate(teacherClass.teacherId, teacherClass.studentsCount)
+      : 25;
+    
+    const totalDue = teacherClass.hours * ratePerHour;
     const balance = totalDue - teacherClass.amountPaid;
+    
     const newTeacherClass: TeacherClass = {
       ...teacherClass,
       id: uuidv4(),
+      ratePerHour,
       totalDue,
       balance
     };
+    
     const updatedTeacherClasses = [...teacherClasses, newTeacherClass];
     setTeacherClasses(updatedTeacherClasses);
     saveToLocalStorage('teacherClasses', updatedTeacherClasses);
@@ -286,10 +293,24 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (teacherClass.id === id) {
         const updatedItem = { ...teacherClass, ...teacherClassData };
         
-        // Recalculate totalDue and balance if necessary fields changed
-        if (teacherClassData.hours !== undefined || teacherClassData.ratePerHour !== undefined) {
-          updatedItem.totalDue = (teacherClassData.hours || teacherClass.hours) * 
-                                (teacherClassData.ratePerHour || teacherClass.ratePerHour);
+        if (teacherClassData.studentsCount !== undefined || 
+            teacherClassData.calculationMethod !== undefined ||
+            teacherClassData.hours !== undefined ||
+            teacherClassData.teacherId !== undefined) {
+          
+          if (teacherClassData.calculationMethod === 'formula' || 
+              (updatedItem.calculationMethod === 'formula' && 
+               (teacherClassData.studentsCount !== undefined || teacherClassData.teacherId !== undefined))) {
+            
+            updatedItem.ratePerHour = calculateTeacherRate(
+              teacherClassData.teacherId || teacherClass.teacherId, 
+              teacherClassData.studentsCount !== undefined ? teacherClassData.studentsCount : teacherClass.studentsCount
+            );
+          } else if (teacherClassData.calculationMethod === 'fixed') {
+            updatedItem.ratePerHour = teacherClassData.ratePerHour || teacherClass.ratePerHour || 25;
+          }
+          
+          updatedItem.totalDue = updatedItem.ratePerHour * (teacherClassData.hours || teacherClass.hours);
         }
         
         if (teacherClassData.amountPaid !== undefined || updatedItem.totalDue !== teacherClass.totalDue) {
@@ -315,7 +336,6 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     refreshStatistics();
   };
 
-  // Expense CRUD operations
   const addExpense = (expense: Omit<Expense, 'id'>) => {
     const newExpense: Expense = {
       ...expense,
@@ -346,7 +366,6 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     refreshStatistics();
   };
 
-  // Course CRUD operations
   const addCourse = (course: Omit<Course, 'id'>) => {
     const newCourse: Course = {
       ...course,
@@ -356,7 +375,6 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setCourses(updatedCourses);
     saveToLocalStorage('courses', updatedCourses);
     
-    // Update the schools structure
     const updatedSchools = [...schools];
     const schoolIndex = updatedSchools.findIndex(s => s.name === course.school);
     
@@ -368,7 +386,6 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (departmentIndex >= 0) {
         updatedSchools[schoolIndex].departments[departmentIndex].courses.push(newCourse);
       } else {
-        // Create new department
         updatedSchools[schoolIndex].departments.push({
           id: uuidv4(),
           name: course.department,
@@ -376,7 +393,6 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         });
       }
     } else {
-      // Create new school and department
       updatedSchools.push({
         id: uuidv4(),
         name: course.school,
@@ -399,33 +415,20 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     );
     setCourses(updatedCourses);
     saveToLocalStorage('courses', updatedCourses);
-    
-    // This would also need to update the schools structure
-    // but for simplicity we'll skip that for now
-    
-    toast.success('Τα στοιχεία του μαθήματος ενημερώθηκαν');
   };
 
   const deleteCourse = (id: string) => {
     const updatedCourses = courses.filter(course => course.id !== id);
     setCourses(updatedCourses);
     saveToLocalStorage('courses', updatedCourses);
-    
-    // This would also need to update the schools structure
-    // but for simplicity we'll skip that for now
-    
-    toast.success('Το μάθημα διαγράφηκε');
   };
 
-  // CSV import for courses
   const uploadCourses = (csvData: string) => {
     try {
-      // Parse CSV data
       const lines = csvData.split('\n');
       const newCourses: Course[] = [];
       const updatedSchools: School[] = [...schools];
       
-      // Skip header row if exists
       const startIndex = lines[0].includes('School') || lines[0].includes('Σχολή') ? 1 : 0;
       
       for (let i = startIndex; i < lines.length; i++) {
@@ -444,11 +447,9 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
           
           newCourses.push(newCourse);
           
-          // Update schools structure
           let schoolIndex = updatedSchools.findIndex(s => s.name === school);
           
           if (schoolIndex === -1) {
-            // Create new school
             updatedSchools.push({
               id: uuidv4(),
               name: school,
@@ -462,7 +463,6 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
           );
           
           if (departmentIndex === -1) {
-            // Create new department
             updatedSchools[schoolIndex].departments.push({
               id: uuidv4(),
               name: department,
@@ -471,12 +471,10 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
             departmentIndex = updatedSchools[schoolIndex].departments.length - 1;
           }
           
-          // Add course to department
           updatedSchools[schoolIndex].departments[departmentIndex].courses.push(newCourse);
         }
       }
       
-      // Update state and local storage
       const allCourses = [...courses, ...newCourses];
       setCourses(allCourses);
       setSchools(updatedSchools);
@@ -519,7 +517,8 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       deleteExpense,
       deleteCourse,
       uploadCourses,
-      refreshStatistics
+      refreshStatistics,
+      calculateTeacherRate
     }}>
       {children}
     </DataContext.Provider>

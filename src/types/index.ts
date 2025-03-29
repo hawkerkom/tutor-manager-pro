@@ -1,4 +1,3 @@
-
 export interface Student {
   id: string;
   lastName: string;
@@ -35,6 +34,8 @@ export interface Teacher {
   firstName: string;
   courses: string[];
   contact: string;
+  baseSalary: number; // Βασικό ποσό ανά ώρα (Χ)
+  studentBonus: number; // Επιπλέον ποσό ανά φοιτητή (Υ)
 }
 
 export interface TeacherClass {
@@ -44,10 +45,12 @@ export interface TeacherClass {
   course: string;
   date: Date;
   hours: number;
+  studentsCount: number; // Αριθμός φοιτητών στο μάθημα
   ratePerHour: number;
   totalDue: number;
   amountPaid: number;
   balance: number;
+  calculationMethod?: 'fixed' | 'formula'; // Μέθοδος υπολογισμού αμοιβής
 }
 
 export interface Expense {
