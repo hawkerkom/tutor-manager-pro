@@ -25,6 +25,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import PageHeader from "@/components/PageHeader";
 import { useData } from "@/contexts/DataContext";
 import { toast } from "sonner";
+import { Student } from "@/types";
 
 const formSchema = z.object({
   lastName: z.string().min(2, {

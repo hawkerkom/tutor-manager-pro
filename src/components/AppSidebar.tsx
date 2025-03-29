@@ -1,3 +1,4 @@
+
 import * as React from "react"
 import {
   LayoutDashboard,
@@ -7,28 +8,44 @@ import {
   ListChecks,
   Settings,
   Users,
-  ScrollText
+  ScrollText,
+  ChevronLeft
 } from "lucide-react"
 import { NavLink } from "react-router-dom"
 
 import { cn } from "@/lib/utils"
+import { Button } from "./ui/button"
 
 interface SidebarProps extends React.HTMLAttributes<HTMLDivElement> {
-  isCollapsed: boolean
+  isCollapsed: boolean;
 }
 
 function AppSidebar({ className, isCollapsed, ...props }: SidebarProps) {
   return (
     <div
       className={cn(
-        "flex h-full w-[280px] flex-col border-r bg-secondary",
-        isCollapsed ? "w-[70px]" : "",
+        "flex h-full flex-col border-r bg-secondary transition-all duration-300",
+        isCollapsed ? "w-[70px]" : "w-[280px]",
         className
       )}
       {...props}
     >
       <div className="flex-1 space-y-1 p-2">
-        <h2 className="pb-2 px-3 text-lg font-semibold">Διαχείριση</h2>
+        <div className="flex items-center justify-between pb-2 px-3">
+          {!isCollapsed && <h2 className="text-lg font-semibold">Διαχείριση</h2>}
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            className="h-7 w-7"
+            onClick={() => {
+              const event = new CustomEvent('toggle-sidebar');
+              window.dispatchEvent(event);
+            }}
+          >
+            <ChevronLeft className={cn("h-4 w-4", isCollapsed && "rotate-180")} />
+            <span className="sr-only">Toggle Sidebar</span>
+          </Button>
+        </div>
         <NavLink
           to="/"
           className={({ isActive }) =>
@@ -129,7 +146,7 @@ function AppSidebar({ className, isCollapsed, ...props }: SidebarProps) {
         </NavLink>
       </div>
     </div>
-  )
+  );
 }
 
-export default AppSidebar
+export default AppSidebar;

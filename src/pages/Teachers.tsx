@@ -1,9 +1,9 @@
 
-import { useState, useRef } from "react";
+import { useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import * as z from "zod";
-import { Trash2, Edit, MoreHorizontal, Upload, Plus } from "lucide-react";
+import { Trash2, Edit, MoreHorizontal } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -34,7 +34,9 @@ import PageHeader from "@/components/PageHeader";
 import { useData } from "@/contexts/DataContext";
 import { Badge } from "@/components/ui/badge";
 import { MultiSelect } from "@/components/MultiSelect";
-import { toast } from "sonner";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import CSVUploader from "@/components/CSVUploader";
+import { parseTeacherCoursesCSV } from "@/utils/csvUtils";
 import type { Teacher } from "@/types";
 
 // Form schema for adding a new teacher
@@ -56,13 +58,10 @@ const formSchema = z.object({
 });
 
 const Teachers = () => {
-  const { teachers, courses, addTeacher, deleteTeacher, uploadTeacherCourses } = useData();
+  const { teachers, courses, addTeacher, deleteTeacher, updateTeacher } = useData();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [isUploadDialogOpen, setIsUploadDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [teacherToDelete, setTeacherToDelete] = useState<Teacher | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const [csvContent, setCsvContent] = useState<string>("");
 
   // Get unique course names from all courses
   const allCourseNames = [...new Set(courses.map((course) => course.name))];
@@ -82,17 +81,7 @@ const Teachers = () => {
 
   // Handle form submission
   const onSubmit = (values: z.infer<typeof formSchema>) => {
-    // Διόρθωση του σφάλματος προσθέτοντας όλα τα απαιτούμενα πεδία
-    const teacherData: Omit<Teacher, "id"> = {
-      lastName: values.lastName,
-      firstName: values.firstName,
-      contact: values.contact,
-      courses: values.courses,
-      baseSalary: values.baseSalary,
-      studentBonus: values.studentBonus
-    };
-    
-    addTeacher(teacherData);
+    addTeacher(values);
     setIsDialogOpen(false);
     form.reset({
       lastName: "",
@@ -102,33 +91,6 @@ const Teachers = () => {
       baseSalary: 16,
       studentBonus: 1,
     });
-  };
-
-  // Handle CSV file upload
-  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        const content = e.target?.result as string;
-        setCsvContent(content);
-      };
-      reader.readAsText(file);
-    }
-  };
-
-  // Handle CSV data upload
-  const handleCsvUpload = () => {
-    if (csvContent) {
-      uploadTeacherCourses(csvContent);
-      setIsUploadDialogOpen(false);
-      setCsvContent("");
-      if (fileInputRef.current) {
-        fileInputRef.current.value = "";
-      }
-    } else {
-      toast.error("Παρακαλώ επιλέξτε ένα αρχείο CSV πρώτα.");
-    }
   };
 
   // Handle delete click
@@ -143,6 +105,20 @@ const Teachers = () => {
       deleteTeacher(teacherToDelete.id);
       setIsDeleteDialogOpen(false);
     }
+  };
+
+  // Handle teacher courses CSV upload
+  const handleTeacherCoursesCSVUpload = (csvContent: string) => {
+    const teacherCourses = parseTeacherCoursesCSV(csvContent);
+    
+    teacherCourses.forEach(({ teacherId, courses }) => {
+      const teacher = teachers.find(t => t.id === teacherId);
+      if (teacher) {
+        // Merge existing courses with new ones
+        const updatedCourses = [...new Set([...teacher.courses, ...courses])];
+        updateTeacher(teacherId, { courses: updatedCourses });
+      }
+    });
   };
 
   // Data table columns
@@ -226,25 +202,46 @@ const Teachers = () => {
       <PageHeader
         title="Καθηγητές"
         description="Διαχείριση καθηγητών και των μαθημάτων τους"
+        action={{
+          label: "Νέος Καθηγητής",
+          onClick: () => setIsDialogOpen(true),
+        }}
       />
 
-      <div className="flex justify-end space-x-2 mb-4">
-        <Button variant="outline" onClick={() => setIsUploadDialogOpen(true)}>
-          <Upload className="mr-2 h-4 w-4" />
-          Εισαγωγή από CSV
-        </Button>
-        <Button onClick={() => setIsDialogOpen(true)}>
-          <Plus className="mr-2 h-4 w-4" />
-          Νέος Καθηγητής
-        </Button>
-      </div>
-
-      <DataTable
-        columns={columns}
-        data={teachers}
-        searchKey="lastName"
-        searchPlaceholder="Αναζήτηση με επώνυμο..."
-      />
+      <Tabs defaultValue="list" className="w-full">
+        <TabsList className="mb-4">
+          <TabsTrigger value="list">Λίστα Καθηγητών</TabsTrigger>
+          <TabsTrigger value="import">Εισαγωγή Μαθημάτων</TabsTrigger>
+        </TabsList>
+        
+        <TabsContent value="list">
+          <DataTable
+            columns={columns}
+            data={teachers}
+            searchKey="lastName"
+            searchPlaceholder="Αναζήτηση με επώνυμο..."
+          />
+        </TabsContent>
+        
+        <TabsContent value="import" className="space-y-6">
+          <CSVUploader
+            title="Εισαγωγή Μαθημάτων Καθηγητών"
+            description="Ανεβάστε ένα αρχείο CSV με αντιστοιχίσεις καθηγητών και μαθημάτων"
+            onUpload={handleTeacherCoursesCSVUpload}
+            acceptedFormat="Μορφή: TeacherId,Course (κάθε γραμμή αντιστοιχεί σε ένα μάθημα ενός καθηγητή)"
+          />
+          
+          <div className="p-4 border rounded-md bg-muted/50">
+            <h3 className="font-medium mb-2">Παράδειγμα αρχείου CSV:</h3>
+            <pre className="text-sm bg-background p-2 rounded">
+              TeacherId,Course<br />
+              {teachers.length > 0 ? `${teachers[0].id},Αλγόριθμοι` : "abc123,Αλγόριθμοι"}<br />
+              {teachers.length > 0 ? `${teachers[0].id},Βάσεις Δεδομένων` : "abc123,Βάσεις Δεδομένων"}<br />
+              {teachers.length > 1 ? `${teachers[1].id},Άλγεβρα` : "def456,Άλγεβρα"}
+            </pre>
+          </div>
+        </TabsContent>
+      </Tabs>
 
       {/* Add Teacher Dialog */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
@@ -308,14 +305,9 @@ const Teachers = () => {
                   name="baseSalary"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Βασικός Μισθός (Χ) σε €</FormLabel>
+                      <FormLabel>Βασικός Μισθός (Χ)</FormLabel>
                       <FormControl>
-                        <Input 
-                          type="number" 
-                          min="0" 
-                          step="0.5"
-                          {...field} 
-                        />
+                        <Input type="number" min="0" step="0.5" {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -327,14 +319,9 @@ const Teachers = () => {
                   name="studentBonus"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Επίδομα ανά Φοιτητή (Υ) σε €</FormLabel>
+                      <FormLabel>Επίδομα/Φοιτητή (Υ)</FormLabel>
                       <FormControl>
-                        <Input 
-                          type="number" 
-                          min="0" 
-                          step="0.25"
-                          {...field} 
-                        />
+                        <Input type="number" min="0" step="0.5" {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -350,13 +337,13 @@ const Teachers = () => {
                     <FormLabel>Μαθήματα</FormLabel>
                     <FormControl>
                       <MultiSelect
-                        options={allCourseNames.map((name) => ({
-                          value: name,
-                          label: name,
+                        options={allCourseNames.map((course) => ({
+                          label: course,
+                          value: course,
                         }))}
                         selected={field.value}
                         onChange={field.onChange}
-                        placeholder="Επιλέξτε μαθήματα"
+                        placeholder="Επιλέξτε μαθήματα..."
                       />
                     </FormControl>
                     <FormMessage />
@@ -375,80 +362,23 @@ const Teachers = () => {
         </DialogContent>
       </Dialog>
 
-      {/* Upload CSV Dialog */}
-      <Dialog open={isUploadDialogOpen} onOpenChange={setIsUploadDialogOpen}>
-        <DialogContent className="sm:max-w-[550px]">
-          <DialogHeader>
-            <DialogTitle>Εισαγωγή Καθηγητών και Μαθημάτων από CSV</DialogTitle>
-            <DialogDescription>
-              Ανεβάστε ένα αρχείο CSV με τους καθηγητές και τα μαθήματά τους. Το αρχείο πρέπει να έχει την εξής μορφή:
-              Επώνυμο, Όνομα, Μάθημα1, Μάθημα2, Μάθημα3, ...
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="space-y-4">
-            <div className="border rounded-md p-4">
-              <input
-                type="file"
-                accept=".csv"
-                onChange={handleFileUpload}
-                ref={fileInputRef}
-                className="w-full"
-              />
-            </div>
-
-            {csvContent && (
-              <div className="border rounded-md p-4 max-h-[200px] overflow-y-auto">
-                <h3 className="font-semibold mb-2">Προεπισκόπηση:</h3>
-                <pre className="text-xs whitespace-pre-wrap">
-                  {csvContent}
-                </pre>
-              </div>
-            )}
-
-            <div className="text-sm text-muted-foreground">
-              <p>Παράδειγμα CSV αρχείου:</p>
-              <code className="text-xs">
-                Παπαδόπουλος, Γιώργος, Αλγόριθμοι, Δομές Δεδομένων, Προγραμματισμός<br />
-                Αντωνίου, Μαρία, Βάσεις Δεδομένων, Δίκτυα<br />
-                Γεωργίου, Νίκος, Μαθηματικά, Φυσική
-              </code>
-            </div>
-
-            <DialogFooter>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => setIsUploadDialogOpen(false)}
-              >
-                Ακύρωση
-              </Button>
-              <Button onClick={handleCsvUpload} disabled={!csvContent}>
-                Εισαγωγή
-              </Button>
-            </DialogFooter>
-          </div>
-        </DialogContent>
-      </Dialog>
-
       {/* Delete confirmation dialog */}
       <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Επιβεβαίωση Διαγραφής</DialogTitle>
             <DialogDescription>
-              Είστε βέβαιοι ότι θέλετε να διαγράψετε τον/την καθηγητή/τρια{" "}
+              Είστε βέβαιοι ότι θέλετε να διαγράψετε τον καθηγητή{" "}
               <span className="font-medium">
-                {teacherToDelete?.lastName} {teacherToDelete?.firstName}
+                {teacherToDelete
+                  ? `${teacherToDelete.lastName} ${teacherToDelete.firstName}`
+                  : ""}
               </span>
               ?
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setIsDeleteDialogOpen(false)}
-            >
+            <Button variant="outline" onClick={() => setIsDeleteDialogOpen(false)}>
               Ακύρωση
             </Button>
             <Button variant="destructive" onClick={confirmDelete}>

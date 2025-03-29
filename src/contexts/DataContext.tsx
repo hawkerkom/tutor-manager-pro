@@ -1,29 +1,8 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
-import { v4 as uuidv4 } from 'uuid';
-import { 
-  Student, 
-  Class, 
-  Teacher, 
-  TeacherClass, 
-  Expense, 
-  Course, 
-  School,
-  StatisticsData
-} from '../types';
-import { 
-  students as initialStudents,
-  classes as initialClasses,
-  teachers as initialTeachers,
-  teacherClasses as initialTeacherClasses,
-  expenses as initialExpenses,
-  schools as initialSchools,
-  courses as initialCourses,
-  statisticsData as initialStatisticsData,
-  saveToLocalStorage,
-  getFromLocalStorage,
-  initializeLocalStorage
-} from '../services/mockData';
-import { toast } from 'sonner';
+import React, { createContext, useContext, useState, useEffect } from "react";
+import { v4 as uuidv4 } from "uuid";
+import { toast } from "sonner";
+import { mockStudents, mockClasses, mockTeachers, mockTeacherClasses, mockExpenses, mockSchools } from "@/services/mockData";
+import type { Student, Class, Teacher, TeacherClass, Expense, Course, School, StatisticsData } from "@/types";
 
 interface DataContextType {
   students: Student[];
@@ -33,533 +12,355 @@ interface DataContextType {
   expenses: Expense[];
   schools: School[];
   courses: Course[];
-  statisticsData: StatisticsData;
-  addStudent: (student: Omit<Student, 'id' | 'createdAt'>) => void;
-  addClass: (classItem: Omit<Class, 'id' | 'total' | 'balance'>) => void;
-  addTeacher: (teacher: Omit<Teacher, 'id'>) => void;
-  addTeacherClass: (teacherClass: Omit<TeacherClass, 'id' | 'totalDue' | 'balance'>) => void;
-  addExpense: (expense: Omit<Expense, 'id'>) => void;
-  addCourse: (course: Omit<Course, 'id'>) => void;
+  statistics: StatisticsData;
+  addStudent: (student: Omit<Student, "id" | "createdAt">) => void;
   updateStudent: (id: string, student: Partial<Student>) => void;
-  updateClass: (id: string, classItem: Partial<Class>) => void;
-  updateTeacher: (id: string, teacher: Partial<Teacher>) => void;
-  updateTeacherClass: (id: string, teacherClass: Partial<TeacherClass>) => void;
-  updateExpense: (id: string, expense: Partial<Expense>) => void;
-  updateCourse: (id: string, course: Partial<Course>) => void;
   deleteStudent: (id: string) => void;
+  addClass: (classItem: Omit<Class, "id">) => void;
+  updateClass: (id: string, classItem: Partial<Class>) => void;
   deleteClass: (id: string) => void;
+  addTeacher: (teacher: Omit<Teacher, "id">) => void;
+  updateTeacher: (id: string, teacher: Partial<Teacher>) => void;
   deleteTeacher: (id: string) => void;
+  addTeacherClass: (teacherClass: Omit<TeacherClass, "id" | "totalDue" | "balance" | "ratePerHour">) => void;
+  updateTeacherClass: (id: string, teacherClass: Partial<TeacherClass>) => void;
   deleteTeacherClass: (id: string) => void;
+  addExpense: (expense: Omit<Expense, "id">) => void;
+  updateExpense: (id: string, expense: Partial<Expense>) => void;
   deleteExpense: (id: string) => void;
-  deleteCourse: (id: string) => void;
-  uploadCourses: (csvData: string) => void;
-  uploadTeacherCourses: (csvData: string) => void;
-  refreshStatistics: () => void;
+  importSchools: (schools: Partial<School>[]) => void;
   calculateTeacherRate: (teacherId: string, studentsCount: number) => number;
 }
 
 const DataContext = createContext<DataContextType | undefined>(undefined);
 
 export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [students, setStudents] = useState<Student[]>([]);
-  const [classes, setClasses] = useState<Class[]>([]);
-  const [teachers, setTeachers] = useState<Teacher[]>([]);
-  const [teacherClasses, setTeacherClasses] = useState<TeacherClass[]>([]);
-  const [expenses, setExpenses] = useState<Expense[]>([]);
-  const [schools, setSchools] = useState<School[]>([]);
-  const [courses, setCourses] = useState<Course[]>([]);
-  const [statisticsData, setStatisticsData] = useState<StatisticsData>(initialStatisticsData);
+  const [students, setStudents] = useState<Student[]>(() => {
+    const storedStudents = localStorage.getItem('students');
+    return storedStudents ? JSON.parse(storedStudents) : mockStudents;
+  });
+  const [classes, setClasses] = useState<Class[]>(() => {
+    const storedClasses = localStorage.getItem('classes');
+    return storedClasses ? JSON.parse(storedClasses) : mockClasses;
+  });
+  const [teachers, setTeachers] = useState<Teacher[]>(() => {
+    const storedTeachers = localStorage.getItem('teachers');
+    return storedTeachers ? JSON.parse(storedTeachers) : mockTeachers;
+  });
+  const [teacherClasses, setTeacherClasses] = useState<TeacherClass[]>(() => {
+    const storedTeacherClasses = localStorage.getItem('teacherClasses');
+    return storedTeacherClasses ? JSON.parse(storedTeacherClasses) : mockTeacherClasses;
+  });
+  const [expenses, setExpenses] = useState<Expense[]>(() => {
+    const storedExpenses = localStorage.getItem('expenses');
+    return storedExpenses ? JSON.parse(storedExpenses) : mockExpenses;
+  });
+  const [schools, setSchools] = useState<School[]>(() => {
+    const storedSchools = localStorage.getItem('schools');
+    return storedSchools ? JSON.parse(storedSchools) : mockSchools;
+  });
+  const [courses, setCourses] = useState<Course[]>(() => {
+    const storedCourses = localStorage.getItem('courses');
+    return storedCourses ? JSON.parse(storedCourses) : schools.flatMap(school =>
+      school.departments.flatMap(department =>
+        department.courses.map(course => ({
+          id: course.id,
+          school: school.name,
+          department: department.name,
+          name: course.name
+        }))
+      )
+    );
+  });
+  const [statistics, setStatistics] = useState<StatisticsData>({
+    studentsCount: {
+      total: mockStudents.length,
+      bySchool: {}
+    },
+    revenue: {
+      daily: 0,
+      monthly: 0,
+      yearly: 0
+    },
+    expenses: {
+      daily: 0,
+      monthly: 0,
+      yearly: 0
+    },
+    studentBalances: 0,
+    teacherBalances: 0
+  });
 
   useEffect(() => {
-    initializeLocalStorage();
-    setStudents(getFromLocalStorage('students', initialStudents));
-    setClasses(getFromLocalStorage('classes', initialClasses));
-    setTeachers(getFromLocalStorage('teachers', initialTeachers));
-    setTeacherClasses(getFromLocalStorage('teacherClasses', initialTeacherClasses));
-    setExpenses(getFromLocalStorage('expenses', initialExpenses));
-    setSchools(getFromLocalStorage('schools', initialSchools));
-    setCourses(getFromLocalStorage('courses', initialCourses));
-    refreshStatistics();
-  }, []);
+    localStorage.setItem('students', JSON.stringify(students));
+  }, [students]);
 
-  const refreshStatistics = () => {
-    const storedStudents = getFromLocalStorage('students', initialStudents);
-    const storedClasses = getFromLocalStorage('classes', initialClasses);
-    const storedExpenses = getFromLocalStorage('expenses', initialExpenses);
-    const storedTeacherClasses = getFromLocalStorage('teacherClasses', initialTeacherClasses);
+  useEffect(() => {
+    localStorage.setItem('classes', JSON.stringify(classes));
+  }, [classes]);
 
-    const schoolCounts: Record<string, number> = {};
-    storedStudents.forEach(student => {
-      schoolCounts[student.school] = (schoolCounts[student.school] || 0) + 1;
-    });
+  useEffect(() => {
+    localStorage.setItem('teachers', JSON.stringify(teachers));
+  }, [teachers]);
 
-    const now = new Date();
-    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-    const firstDayOfYear = new Date(now.getFullYear(), 0, 1);
+  useEffect(() => {
+    localStorage.setItem('teacherClasses', JSON.stringify(teacherClasses));
+  }, [teacherClasses]);
 
-    const dailyRevenue = storedClasses
-      .filter(c => new Date(c.date).getTime() >= today.getTime())
-      .reduce((sum, c) => sum + c.amountPaid, 0);
+  useEffect(() => {
+    localStorage.setItem('expenses', JSON.stringify(expenses));
+  }, [expenses]);
 
-    const monthlyRevenue = storedClasses
-      .filter(c => new Date(c.date).getTime() >= firstDayOfMonth.getTime())
-      .reduce((sum, c) => sum + c.amountPaid, 0);
+  useEffect(() => {
+    localStorage.setItem('schools', JSON.stringify(schools));
+  }, [schools]);
 
-    const yearlyRevenue = storedClasses
-      .filter(c => new Date(c.date).getTime() >= firstDayOfYear.getTime())
-      .reduce((sum, c) => sum + c.amountPaid, 0);
+  useEffect(() => {
+    localStorage.setItem('courses', JSON.stringify(courses));
+  }, [courses]);
 
-    const dailyExpenses = storedExpenses
-      .filter(e => new Date(e.date).getTime() >= today.getTime())
-      .reduce((sum, e) => sum + e.amount, 0);
-
-    const monthlyExpenses = storedExpenses
-      .filter(e => new Date(e.date).getTime() >= firstDayOfMonth.getTime())
-      .reduce((sum, e) => sum + e.amount, 0);
-
-    const yearlyExpenses = storedExpenses
-      .filter(e => new Date(e.date).getTime() >= firstDayOfYear.getTime())
-      .reduce((sum, e) => sum + e.amount, 0);
-
-    const studentBalances = storedClasses.reduce((sum, c) => sum + c.balance, 0);
-    const teacherBalances = storedTeacherClasses.reduce((sum, tc) => sum + tc.balance, 0);
-
-    const newStatistics: StatisticsData = {
-      studentsCount: {
-        total: storedStudents.length,
-        bySchool: schoolCounts
-      },
-      revenue: {
-        daily: dailyRevenue,
-        monthly: monthlyRevenue,
-        yearly: yearlyRevenue
-      },
-      expenses: {
-        daily: dailyExpenses,
-        monthly: monthlyExpenses,
-        yearly: yearlyExpenses
-      },
-      studentBalances,
-      teacherBalances
-    };
-
-    setStatisticsData(newStatistics);
-    saveToLocalStorage('statisticsData', newStatistics);
+  const saveToLocalStorage = (key: string, data: any) => {
+    localStorage.setItem(key, JSON.stringify(data));
   };
 
-  const calculateTeacherRate = (teacherId: string, studentsCount: number) => {
-    const teacher = teachers.find(t => t.id === teacherId);
-    if (!teacher) return 25;
-    
-    const baseSalary = teacher.baseSalary || 16;
-    const studentBonus = teacher.studentBonus || 1;
-    
-    return baseSalary + (studentBonus * studentsCount);
-  };
-
-  const addStudent = (student: Omit<Student, 'id' | 'createdAt'>) => {
+  const addStudent = (student: Omit<Student, "id" | "createdAt">) => {
     const newStudent: Student = {
-      ...student,
       id: uuidv4(),
+      ...student,
       createdAt: new Date()
     };
-    const updatedStudents = [...students, newStudent];
-    setStudents(updatedStudents);
-    saveToLocalStorage('students', updatedStudents);
-    toast.success('Ο φοιτητής προστέθηκε επιτυχώς');
-    refreshStatistics();
+    setStudents([...students, newStudent]);
+    saveToLocalStorage('students', [...students, newStudent]);
+    setStatistics(prev => ({
+      ...prev,
+      studentsCount: {
+        ...prev.studentsCount,
+        total: prev.studentsCount.total + 1
+      }
+    }));
+    toast.success("Ο φοιτητής καταχωρήθηκε επιτυχώς!");
   };
 
-  const updateStudent = (id: string, studentData: Partial<Student>) => {
-    const updatedStudents = students.map(student => 
-      student.id === id ? { ...student, ...studentData } : student
-    );
+  const updateStudent = (id: string, student: Partial<Student>) => {
+    const updatedStudents = students.map(s => s.id === id ? { ...s, ...student } : s);
     setStudents(updatedStudents);
     saveToLocalStorage('students', updatedStudents);
-    toast.success('Τα στοιχεία του φοιτητή ενημερώθηκαν');
-    refreshStatistics();
+    toast.success("Τα στοιχεία του φοιτητή ανανεώθηκαν επιτυχώς!");
   };
 
   const deleteStudent = (id: string) => {
-    const updatedStudents = students.filter(student => student.id !== id);
-    setStudents(updatedStudents);
-    saveToLocalStorage('students', updatedStudents);
-    toast.success('Ο φοιτητής διαγράφηκε');
-    refreshStatistics();
-  };
-
-  const addClass = (classItem: Omit<Class, 'id' | 'total' | 'balance'>) => {
-    const total = classItem.hours * classItem.ratePerHour;
-    const balance = total - classItem.amountPaid;
-    const newClass: Class = {
-      ...classItem,
-      id: uuidv4(),
-      total,
-      balance
-    };
-    const updatedClasses = [...classes, newClass];
-    setClasses(updatedClasses);
-    saveToLocalStorage('classes', updatedClasses);
-    toast.success('Το μάθημα καταχωρήθηκε επιτυχώς');
-    refreshStatistics();
-  };
-
-  const updateClass = (id: string, classData: Partial<Class>) => {
-    const updatedClasses = classes.map(classItem => {
-      if (classItem.id === id) {
-        const updatedItem = { ...classItem, ...classData };
-        
-        if (classData.hours !== undefined || classData.ratePerHour !== undefined) {
-          updatedItem.total = (classData.hours || classItem.hours) * (classData.ratePerHour || classItem.ratePerHour);
-        }
-        
-        if (classData.amountPaid !== undefined || updatedItem.total !== classItem.total) {
-          updatedItem.balance = updatedItem.total - (classData.amountPaid || classItem.amountPaid);
-        }
-        
-        return updatedItem;
+    setStudents(students.filter(s => s.id !== id));
+    saveToLocalStorage('students', students.filter(s => s.id !== id));
+    setStatistics(prev => ({
+      ...prev,
+      studentsCount: {
+        ...prev.studentsCount,
+        total: prev.studentsCount.total - 1
       }
-      return classItem;
-    });
-    
+    }));
+    toast.success("Ο φοιτητής διαγράφηκε επιτυχώς!");
+  };
+
+  const addClass = (classItem: Omit<Class, "id">) => {
+    const newClass: Class = {
+      id: uuidv4(),
+      ...classItem
+    };
+    setClasses([...classes, newClass]);
+    saveToLocalStorage('classes', [...classes, newClass]);
+    toast.success("Το μάθημα καταχωρήθηκε επιτυχώς!");
+  };
+
+  const updateClass = (id: string, classItem: Partial<Class>) => {
+    const updatedClasses = classes.map(c => c.id === id ? { ...c, ...classItem } : c);
     setClasses(updatedClasses);
     saveToLocalStorage('classes', updatedClasses);
-    toast.success('Τα στοιχεία του μαθήματος ενημερώθηκαν');
-    refreshStatistics();
+    toast.success("Τα στοιχεία του μαθήματος ανανεώθηκαν επιτυχώς!");
   };
 
   const deleteClass = (id: string) => {
-    const updatedClasses = classes.filter(classItem => classItem.id !== id);
-    setClasses(updatedClasses);
-    saveToLocalStorage('classes', updatedClasses);
-    toast.success('Το μάθημα διαγράφηκε');
-    refreshStatistics();
+    setClasses(classes.filter(c => c.id !== id));
+    saveToLocalStorage('classes', classes.filter(c => c.id !== id));
+    toast.success("Το μάθημα διαγράφηκε επιτυχώς!");
   };
 
-  const addTeacher = (teacher: Omit<Teacher, 'id'>) => {
+  const addTeacher = (teacher: Omit<Teacher, "id">) => {
     const newTeacher: Teacher = {
-      ...teacher,
       id: uuidv4(),
-      baseSalary: teacher.baseSalary || 16,
-      studentBonus: teacher.studentBonus || 1
+      ...teacher
     };
-    const updatedTeachers = [...teachers, newTeacher];
-    setTeachers(updatedTeachers);
-    saveToLocalStorage('teachers', updatedTeachers);
-    toast.success('Ο καθηγητής προστέθηκε επιτυχώς');
+    setTeachers([...teachers, newTeacher]);
+    saveToLocalStorage('teachers', [...teachers, newTeacher]);
+    toast.success("Ο καθηγητής καταχωρήθηκε επιτυχώς!");
   };
 
-  const updateTeacher = (id: string, teacherData: Partial<Teacher>) => {
-    const updatedTeachers = teachers.map(teacher => 
-      teacher.id === id ? { ...teacher, ...teacherData } : teacher
-    );
+  const updateTeacher = (id: string, teacher: Partial<Teacher>) => {
+    const updatedTeachers = teachers.map(t => t.id === id ? { ...t, ...teacher } : t);
     setTeachers(updatedTeachers);
     saveToLocalStorage('teachers', updatedTeachers);
-    toast.success('Τα στοιχεία του καθηγητή ενημερώθηκαν');
+    toast.success("Τα στοιχεία του καθηγητή ανανεώθηκαν επιτυχώς!");
   };
 
   const deleteTeacher = (id: string) => {
-    const updatedTeachers = teachers.filter(teacher => teacher.id !== id);
-    setTeachers(updatedTeachers);
-    saveToLocalStorage('teachers', updatedTeachers);
-    toast.success('Ο καθηγητής διαγράφηκε');
+    setTeachers(teachers.filter(t => t.id !== id));
+    saveToLocalStorage('teachers', teachers.filter(t => t.id !== id));
+    toast.success("Ο καθηγητής διαγράφηκε επιτυχώς!");
   };
 
-  const addTeacherClass = (teacherClass: Omit<TeacherClass, 'id' | 'totalDue' | 'balance' | 'ratePerHour'>) => {
-    const ratePerHour = teacherClass.calculationMethod === 'formula' 
-      ? calculateTeacherRate(teacherClass.teacherId, teacherClass.studentsCount)
-      : 25;
-    
+  const addTeacherClass = (teacherClass: Omit<TeacherClass, "id" | "totalDue" | "balance" | "ratePerHour">) => {
+    const teacher = teachers.find(t => t.id === teacherClass.teacherId);
+    if (!teacher) {
+      toast.error("Δεν βρέθηκε ο καθηγητής!");
+      return;
+    }
+
+    const ratePerHour = calculateTeacherRate(teacher.id, teacherClass.studentsCount);
     const totalDue = teacherClass.hours * ratePerHour;
-    const balance = totalDue - teacherClass.amountPaid;
-    
     const newTeacherClass: TeacherClass = {
-      ...teacherClass,
       id: uuidv4(),
-      ratePerHour,
-      totalDue,
-      balance
+      ...teacherClass,
+      teacherName: `${teacher.firstName} ${teacher.lastName}`,
+      ratePerHour: ratePerHour,
+      totalDue: totalDue,
+      amountPaid: 0,
+      balance: totalDue
     };
-    
-    const updatedTeacherClasses = [...teacherClasses, newTeacherClass];
-    setTeacherClasses(updatedTeacherClasses);
-    saveToLocalStorage('teacherClasses', updatedTeacherClasses);
-    toast.success('Η διδασκαλία καταχωρήθηκε επιτυχώς');
-    refreshStatistics();
+    setTeacherClasses([...teacherClasses, newTeacherClass]);
+    saveToLocalStorage('teacherClasses', [...teacherClasses, newTeacherClass]);
+    toast.success("Η διδασκαλία καταχωρήθηκε επιτυχώς!");
   };
 
-  const updateTeacherClass = (id: string, teacherClassData: Partial<TeacherClass>) => {
-    const updatedTeacherClasses = teacherClasses.map(teacherClass => {
-      if (teacherClass.id === id) {
-        const updatedItem = { ...teacherClass, ...teacherClassData };
-        
-        if (teacherClassData.studentsCount !== undefined || 
-            teacherClassData.calculationMethod !== undefined ||
-            teacherClassData.hours !== undefined ||
-            teacherClassData.teacherId !== undefined) {
-          
-          if (teacherClassData.calculationMethod === 'formula' || 
-              (updatedItem.calculationMethod === 'formula' && 
-               (teacherClassData.studentsCount !== undefined || teacherClassData.teacherId !== undefined))) {
-            
-            updatedItem.ratePerHour = calculateTeacherRate(
-              teacherClassData.teacherId || teacherClass.teacherId, 
-              teacherClassData.studentsCount !== undefined ? teacherClassData.studentsCount : teacherClass.studentsCount
-            );
-          } else if (teacherClassData.calculationMethod === 'fixed') {
-            updatedItem.ratePerHour = teacherClassData.ratePerHour || teacherClass.ratePerHour || 25;
-          }
-          
-          updatedItem.totalDue = updatedItem.ratePerHour * (teacherClassData.hours || teacherClass.hours);
-        }
-        
-        if (teacherClassData.amountPaid !== undefined || updatedItem.totalDue !== teacherClass.totalDue) {
-          updatedItem.balance = updatedItem.totalDue - (teacherClassData.amountPaid || teacherClass.amountPaid);
-        }
-        
-        return updatedItem;
-      }
-      return teacherClass;
-    });
-    
+  const updateTeacherClass = (id: string, teacherClass: Partial<TeacherClass>) => {
+    const updatedTeacherClasses = teacherClasses.map(tc => tc.id === id ? { ...tc, ...teacherClass } : tc);
     setTeacherClasses(updatedTeacherClasses);
     saveToLocalStorage('teacherClasses', updatedTeacherClasses);
-    toast.success('Τα στοιχεία της διδασκαλίας ενημερώθηκαν');
-    refreshStatistics();
+    toast.success("Τα στοιχεία της διδασκαλίας ανανεώθηκαν επιτυχώς!");
   };
 
   const deleteTeacherClass = (id: string) => {
-    const updatedTeacherClasses = teacherClasses.filter(teacherClass => teacherClass.id !== id);
-    setTeacherClasses(updatedTeacherClasses);
-    saveToLocalStorage('teacherClasses', updatedTeacherClasses);
-    toast.success('Η διδασκαλία διαγράφηκε');
-    refreshStatistics();
+    setTeacherClasses(teacherClasses.filter(tc => tc.id !== id));
+    saveToLocalStorage('teacherClasses', teacherClasses.filter(tc => tc.id !== id));
+    toast.success("Η διδασκαλία διαγράφηκε επιτυχώς!");
   };
 
-  const addExpense = (expense: Omit<Expense, 'id'>) => {
+  const addExpense = (expense: Omit<Expense, "id">) => {
     const newExpense: Expense = {
+      id: uuidv4(),
       ...expense,
-      id: uuidv4()
     };
-    const updatedExpenses = [...expenses, newExpense];
-    setExpenses(updatedExpenses);
-    saveToLocalStorage('expenses', updatedExpenses);
-    toast.success('Το έξοδο προστέθηκε επιτυχώς');
-    refreshStatistics();
+    setExpenses([...expenses, newExpense]);
+    saveToLocalStorage('expenses', [...expenses, newExpense]);
+    toast.success("Το έξοδο καταχωρήθηκε επιτυχώς!");
   };
 
-  const updateExpense = (id: string, expenseData: Partial<Expense>) => {
-    const updatedExpenses = expenses.map(expense => 
-      expense.id === id ? { ...expense, ...expenseData } : expense
-    );
+  const updateExpense = (id: string, expense: Partial<Expense>) => {
+    const updatedExpenses = expenses.map(e => e.id === id ? { ...e, ...expense } : e);
     setExpenses(updatedExpenses);
     saveToLocalStorage('expenses', updatedExpenses);
-    toast.success('Τα στοιχεία του εξόδου ενημερώθηκαν');
-    refreshStatistics();
+    toast.success("Τα στοιχεία του εξόδου ανανεώθηκαν επιτυχώς!");
   };
 
   const deleteExpense = (id: string) => {
-    const updatedExpenses = expenses.filter(expense => expense.id !== id);
-    setExpenses(updatedExpenses);
-    saveToLocalStorage('expenses', updatedExpenses);
-    toast.success('Το έξοδο διαγράφηκε');
-    refreshStatistics();
+    setExpenses(expenses.filter(e => e.id !== id));
+    saveToLocalStorage('expenses', expenses.filter(e => e.id !== id));
+    toast.success("Το έξοδο διαγράφηκε επιτυχώς!");
   };
 
-  const addCourse = (course: Omit<Course, 'id'>) => {
-    const newCourse: Course = {
-      ...course,
-      id: uuidv4()
-    };
-    const updatedCourses = [...courses, newCourse];
-    setCourses(updatedCourses);
-    saveToLocalStorage('courses', updatedCourses);
-    
-    const updatedSchools = [...schools];
-    const schoolIndex = updatedSchools.findIndex(s => s.name === course.school);
-    
-    if (schoolIndex >= 0) {
-      const departmentIndex = updatedSchools[schoolIndex].departments.findIndex(
-        d => d.name === course.department
-      );
+  const importSchools = (importedSchools: Partial<School>[]) => {
+    const newSchools = importedSchools.map(importedSchool => {
+      const existingSchool = schools.find(s => s.name === importedSchool.name);
       
-      if (departmentIndex >= 0) {
-        updatedSchools[schoolIndex].departments[departmentIndex].courses.push(newCourse);
-      } else {
-        updatedSchools[schoolIndex].departments.push({
-          id: uuidv4(),
-          name: course.department,
-          courses: [newCourse]
-        });
-      }
-    } else {
-      updatedSchools.push({
-        id: uuidv4(),
-        name: course.school,
-        departments: [{
-          id: uuidv4(),
-          name: course.department,
-          courses: [newCourse]
-        }]
-      });
-    }
-    
-    setSchools(updatedSchools);
-    saveToLocalStorage('schools', updatedSchools);
-    toast.success('Το μάθημα προστέθηκε επιτυχώς');
-  };
-
-  const updateCourse = (id: string, courseData: Partial<Course>) => {
-    const updatedCourses = courses.map(course => 
-      course.id === id ? { ...course, ...courseData } : course
-    );
-    setCourses(updatedCourses);
-    saveToLocalStorage('courses', updatedCourses);
-  };
-
-  const deleteCourse = (id: string) => {
-    const updatedCourses = courses.filter(course => course.id !== id);
-    setCourses(updatedCourses);
-    saveToLocalStorage('courses', updatedCourses);
-  };
-
-  const uploadCourses = (csvData: string) => {
-    try {
-      const lines = csvData.split('\n');
-      const newCourses: Course[] = [];
-      const updatedSchools: School[] = [...schools];
-      
-      const startIndex = lines[0].includes('School') || lines[0].includes('Σχολή') ? 1 : 0;
-      
-      for (let i = startIndex; i < lines.length; i++) {
-        const line = lines[i].trim();
-        if (!line) continue;
+      if (existingSchool) {
+        const updatedDepartments = [...existingSchool.departments];
         
-        const [school, department, courseName] = line.split(',').map(s => s.trim());
-        
-        if (school && department && courseName) {
-          const newCourse: Course = {
-            id: uuidv4(),
-            school,
-            department,
-            name: courseName
-          };
+        importedSchool.departments?.forEach(importedDept => {
+          const existingDeptIndex = updatedDepartments.findIndex(d => d.name === importedDept.name);
           
-          newCourses.push(newCourse);
-          
-          let schoolIndex = updatedSchools.findIndex(s => s.name === school);
-          
-          if (schoolIndex === -1) {
-            updatedSchools.push({
-              id: uuidv4(),
-              name: school,
-              departments: []
-            });
-            schoolIndex = updatedSchools.length - 1;
-          }
-          
-          let departmentIndex = updatedSchools[schoolIndex].departments.findIndex(
-            d => d.name === department
-          );
-          
-          if (departmentIndex === -1) {
-            updatedSchools[schoolIndex].departments.push({
-              id: uuidv4(),
-              name: department,
-              courses: []
-            });
-            departmentIndex = updatedSchools[schoolIndex].departments.length - 1;
-          }
-          
-          updatedSchools[schoolIndex].departments[departmentIndex].courses.push(newCourse);
-        }
-      }
-      
-      const allCourses = [...courses, ...newCourses];
-      setCourses(allCourses);
-      setSchools(updatedSchools);
-      saveToLocalStorage('courses', allCourses);
-      saveToLocalStorage('schools', updatedSchools);
-      
-      toast.success(`${newCourses.length} μαθήματα εισήχθησαν επιτυχώς`);
-    } catch (error) {
-      console.error('Error parsing CSV:', error);
-      toast.error('Σφάλμα κατά την εισαγωγή του αρχείου CSV');
-    }
-  };
-
-  const uploadTeacherCourses = (csvData: string) => {
-    try {
-      const lines = csvData.split('\n');
-      const updatedTeachers = [...teachers];
-      let updatedCount = 0;
-      let newTeacherCount = 0;
-      
-      const startIndex = lines[0].includes('Teacher') || lines[0].includes('Καθηγητής') || 
-                        lines[0].includes('LastName') || lines[0].includes('Επώνυμο') ? 1 : 0;
-      
-      for (let i = startIndex; i < lines.length; i++) {
-        const line = lines[i].trim();
-        if (!line) continue;
-        
-        const parts = line.split(',').map(s => s.trim());
-        
-        if (parts.length >= 3) { // Τουλάχιστον επώνυμο, όνομα και 1 μάθημα
-          const lastName = parts[0];
-          const firstName = parts[1];
-          const teacherCourses = parts.slice(2).filter(c => c.length > 0);
-          const baseSalary = 16; // Default values
-          const studentBonus = 1; // Default values
-        
-          if (lastName && firstName && teacherCourses.length > 0) {
-            // Αναζήτηση υπάρχοντος καθηγητή με το ίδιο επώνυμο και όνομα
-            let teacherIndex = updatedTeachers.findIndex(
-              t => t.lastName.toLowerCase() === lastName.toLowerCase() && 
-                   t.firstName.toLowerCase() === firstName.toLowerCase()
-            );
+          if (existingDeptIndex >= 0) {
+            const existingCourses = updatedDepartments[existingDeptIndex].courses;
+            const importedCourses = importedDept.courses || [];
             
-            if (teacherIndex !== -1) {
-              // Ενημέρωση μαθημάτων υπάρχοντος καθηγητή
-              const existingCourses = new Set(updatedTeachers[teacherIndex].courses);
-              for (const course of teacherCourses) {
-                existingCourses.add(course);
+            importedCourses.forEach(importedCourse => {
+              if (!existingCourses.some(c => c.name === importedCourse.name)) {
+                existingCourses.push({
+                  id: uuidv4(),
+                  ...importedCourse
+                });
               }
-              updatedTeachers[teacherIndex].courses = Array.from(existingCourses);
-              updatedCount++;
-            } else {
-              // Προσθήκη νέου καθηγητή
-              updatedTeachers.push({
+            });
+          } else {
+            updatedDepartments.push({
+              id: uuidv4(),
+              name: importedDept.name || "",
+              courses: (importedDept.courses || []).map(course => ({
                 id: uuidv4(),
-                lastName,
-                firstName,
-                courses: teacherCourses,
-                contact: "",
-                baseSalary,
-                studentBonus
-              });
-              newTeacherCount++;
-            }
+                ...course
+              }))
+            });
           }
-        }
-      }
-      
-      setTeachers(updatedTeachers);
-      saveToLocalStorage('teachers', updatedTeachers);
-      
-      if (newTeacherCount > 0 && updatedCount > 0) {
-        toast.success(`Προστέθηκαν ${newTeacherCount} νέοι καθηγητές και ενημερώθηκαν ${updatedCount}`);
-      } else if (newTeacherCount > 0) {
-        toast.success(`Προστέθηκαν ${newTeacherCount} νέοι καθηγητές`);
-      } else if (updatedCount > 0) {
-        toast.success(`Ενημερώθηκαν τα μαθήματα για ${updatedCount} καθηγητές`);
+        });
+        
+        return {
+          ...existingSchool,
+          departments: updatedDepartments
+        };
       } else {
-        toast.info(`Δεν έγιναν αλλαγές`);
+        return {
+          id: uuidv4(),
+          name: importedSchool.name || "",
+          departments: (importedSchool.departments || []).map(dept => ({
+            id: uuidv4(),
+            name: dept.name || "",
+            courses: (dept.courses || []).map(course => ({
+              id: uuidv4(),
+              ...course
+            }))
+          }))
+        };
       }
-    } catch (error) {
-      console.error('Error parsing CSV:', error);
-      toast.error('Σφάλμα κατά την εισαγωγή του αρχείου CSV');
+    });
+    
+    const mergedSchools = [
+      ...schools.filter(school => !newSchools.some(newSchool => newSchool.name === school.name)),
+      ...newSchools
+    ];
+    
+    setSchools(mergedSchools);
+    saveToLocalStorage('schools', mergedSchools);
+    
+    const allCourses = extractCoursesFromSchools(mergedSchools);
+    setCourses(allCourses);
+    saveToLocalStorage('courses', allCourses);
+    
+    toast.success('Οι σχολές και τα μαθήματα εισήχθησαν επιτυχώς');
+  };
+
+  const extractCoursesFromSchools = (schools: School[]): Course[] => {
+    const coursesArray: Course[] = [];
+    
+    schools.forEach(school => {
+      school.departments.forEach(department => {
+        department.courses.forEach(course => {
+          coursesArray.push({
+            id: course.id,
+            school: school.name,
+            department: department.name,
+            name: course.name
+          });
+        });
+      });
+    });
+    
+    return coursesArray;
+  };
+
+  const calculateTeacherRate = (teacherId: string, studentsCount: number): number => {
+    const teacher = teachers.find(t => t.id === teacherId);
+    if (!teacher) {
+      return 0;
     }
+
+    return teacher.baseSalary + (teacher.studentBonus * studentsCount);
   };
 
   return (
@@ -571,28 +372,23 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       expenses,
       schools,
       courses,
-      statisticsData,
+      statistics,
       addStudent,
-      addClass,
-      addTeacher,
-      addTeacherClass,
-      addExpense,
-      addCourse,
       updateStudent,
-      updateClass,
-      updateTeacher,
-      updateTeacherClass,
-      updateExpense,
-      updateCourse,
       deleteStudent,
+      addClass,
+      updateClass,
       deleteClass,
+      addTeacher,
+      updateTeacher,
       deleteTeacher,
+      addTeacherClass,
+      updateTeacherClass,
       deleteTeacherClass,
+      addExpense,
+      updateExpense,
       deleteExpense,
-      deleteCourse,
-      uploadCourses,
-      uploadTeacherCourses,
-      refreshStatistics,
+      importSchools,
       calculateTeacherRate
     }}>
       {children}
@@ -602,8 +398,8 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
 export const useData = () => {
   const context = useContext(DataContext);
-  if (context === undefined) {
-    throw new Error('useData must be used within a DataProvider');
+  if (!context) {
+    throw new Error("useData must be used within a DataProvider");
   }
   return context;
 };
