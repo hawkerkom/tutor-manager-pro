@@ -62,7 +62,7 @@ const formSchema = z.object({
   firstName: z.string().min(2, {
     message: "Firstname must be at least 2 characters.",
   }),
-  courses: z.array(z.string()).nonempty({
+  courses: z.array(z.string()).min(1, {
     message: "Please select at least one course.",
   }),
   contact: z.string().min(10, {
@@ -125,12 +125,12 @@ const Teachers = () => {
     } else {
       // Create new teacher
       const newTeacher = {
-        lastName: values.lastName || "", // Ensure required property has a value (even if empty string)
-        firstName: values.firstName || "", // Ensure required property has a value
-        courses: values.courses || [], // Ensure required property has a value
-        contact: values.contact || "", // Ensure required property has a value
-        baseSalary: parseFloat(values.baseSalary) || 0, // Ensure required property has a value
-        studentBonus: parseFloat(values.studentBonus) || 0 // Ensure required property has a value
+        lastName: values.lastName || "", 
+        firstName: values.firstName || "", 
+        courses: values.courses || [], 
+        contact: values.contact || "", 
+        baseSalary: parseFloat(values.baseSalary) || 0, 
+        studentBonus: parseFloat(values.studentBonus) || 0 
       };
       addTeacher(newTeacher);
       toast.success("Teacher created successfully!");
@@ -284,10 +284,10 @@ const Teachers = () => {
                   <FormItem>
                     <FormLabel>Μαθήματα</FormLabel>
                     <Select
-                      multiple
                       onValueChange={(value) => {
-                        field.onChange(value);
-                        setSelectedCourses(value);
+                        const valueArray = Array.isArray(value) ? value : [value];
+                        field.onChange(valueArray);
+                        setSelectedCourses(valueArray);
                       }}
                       defaultValue={selectedCourses}
                     >

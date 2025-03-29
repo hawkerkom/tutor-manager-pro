@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -20,6 +21,7 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { Trash2 } from "lucide-react";
+import { Class } from "@/types";
 
 const Classes = () => {
   const { students, classes, addClass, updateClass, deleteClass, schools, courses } = useData();
@@ -46,7 +48,7 @@ const Classes = () => {
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
   const [hours, setHours] = useState<number>(1);
   const [ratePerHour, setRatePerHour] = useState<number>(20);
-  const [paymentStatus, setPaymentStatus] = useState<string>("pending");
+  const [paymentStatus, setPaymentStatus] = useState<"pending" | "paid" | "partial">("pending");
   const [paymentDate, setPaymentDate] = useState<Date | undefined>();
   const [amountPaid, setAmountPaid] = useState<number>(0);
   const [paymentMethod, setPaymentMethod] = useState<string>("");
