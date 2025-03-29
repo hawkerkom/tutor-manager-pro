@@ -3,7 +3,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import { DataProvider } from "./contexts/DataContext";
 import Layout from "./components/Layout";
@@ -33,6 +33,8 @@ const App = () => (
                 <Route index element={<Dashboard />} />
                 <Route path="students" element={<Students />} />
                 <Route path="register-student" element={<RegisterStudent />} />
+                {/* Redirect from old route to new route */}
+                <Route path="register" element={<Navigate to="/register-student" replace />} />
                 <Route path="classes" element={<Classes />} />
                 <Route path="teachers" element={<Teachers />} />
                 <Route path="teacher-classes" element={<TeacherClasses />} />
