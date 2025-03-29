@@ -15,7 +15,7 @@ import {
 } from "lucide-react";
 
 const Statistics = () => {
-  const { statisticsData, students, classes, teachers, expenses } = useData();
+  const { statistics, students, classes, teachers, expenses } = useData();
 
   return (
     <div>
@@ -33,7 +33,7 @@ const Statistics = () => {
             <Users className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{statisticsData.studentsCount.total}</div>
+            <div className="text-2xl font-bold">{statistics.studentsCount.total}</div>
           </CardContent>
         </Card>
 
@@ -45,7 +45,7 @@ const Statistics = () => {
             <TrendingUp className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{statisticsData.revenue.monthly}€</div>
+            <div className="text-2xl font-bold">{statistics.revenue.monthly}€</div>
           </CardContent>
         </Card>
 
@@ -57,7 +57,7 @@ const Statistics = () => {
             <TrendingDown className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{statisticsData.expenses.monthly}€</div>
+            <div className="text-2xl font-bold">{statistics.expenses.monthly}€</div>
           </CardContent>
         </Card>
 
@@ -69,7 +69,7 @@ const Statistics = () => {
             <DollarSign className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{statisticsData.revenue.monthly - statisticsData.expenses.monthly}€</div>
+            <div className="text-2xl font-bold">{statistics.revenue.monthly - statistics.expenses.monthly}€</div>
           </CardContent>
         </Card>
       </div>
@@ -106,7 +106,7 @@ const Statistics = () => {
             <CardTitle>Εκκρεμείς Πληρωμές Φοιτητών</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold">{statisticsData.studentBalances}€</div>
+            <div className="text-3xl font-bold">{statistics.studentBalances}€</div>
             <p className="text-muted-foreground">
               Συνολικό ποσό που εκκρεμεί από μαθητές
             </p>
@@ -118,7 +118,7 @@ const Statistics = () => {
             <CardTitle>Οφειλές προς Καθηγητές</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold">{statisticsData.teacherBalances}€</div>
+            <div className="text-3xl font-bold">{statistics.teacherBalances}€</div>
             <p className="text-muted-foreground">
               Συνολικό ποσό που οφείλεται σε καθηγητές
             </p>

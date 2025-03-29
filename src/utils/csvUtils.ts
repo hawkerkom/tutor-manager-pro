@@ -1,101 +1,86 @@
 
-/**
- * Parse CSV string into an array of records
- * @param csvString The CSV string to parse
- * @returns Array of objects representing the CSV data
- */
-export const parseCSV = (csvString: string): Record<string, string>[] => {
-  const lines = csvString.split('\n');
-  const headers = lines[0].split(',').map(header => header.trim());
+import { v4 as uuidv4 } from "uuid";
+import type { School, Course, Department } from "@/types";
+
+export const parseSchoolsCSV = (csvContent: string): School[] => {
+  const lines = csvContent.trim().split("\n");
+  // Skip header row if it exists
+  const startIndex = lines[0].includes("School,Department,Course") ? 1 : 0;
   
-  return lines.slice(1).filter(line => line.trim() !== '').map(line => {
-    const values = line.split(',').map(value => value.trim());
-    const record: Record<string, string> = {};
-    
-    headers.forEach((header, index) => {
-      record[header] = values[index] || '';
+  // Group by schools and departments
+  const schoolsMap: Record<string, Record<string, string[]>> = {};
+  
+  for (let i = startIndex; i < lines.length; i++) {
+    const columns = lines[i].split(",");
+    if (columns.length >= 3) {
+      const schoolName = columns[0].trim();
+      const departmentName = columns[1].trim();
+      const courseName = columns[2].trim();
+      
+      if (!schoolsMap[schoolName]) {
+        schoolsMap[schoolName] = {};
+      }
+      
+      if (!schoolsMap[schoolName][departmentName]) {
+        schoolsMap[schoolName][departmentName] = [];
+      }
+      
+      if (courseName && !schoolsMap[schoolName][departmentName].includes(courseName)) {
+        schoolsMap[schoolName][departmentName].push(courseName);
+      }
+    }
+  }
+  
+  // Convert to School format
+  const parsedSchools: School[] = Object.keys(schoolsMap).map(schoolName => {
+    const departments: Department[] = Object.keys(schoolsMap[schoolName]).map(deptName => {
+      const courses: Course[] = schoolsMap[schoolName][deptName].map(courseName => ({
+        id: uuidv4(),
+        name: courseName,
+        school: schoolName,
+        department: deptName
+      }));
+      
+      return {
+        id: uuidv4(),
+        name: deptName,
+        courses
+      };
     });
     
-    return record;
-  });
-};
-
-/**
- * Parse CSV for schools and departments with courses
- * Expected format: School,Department,Course
- * @param csvString The CSV string to parse
- * @returns Structured school data
- */
-export const parseSchoolsCSV = (csvString: string) => {
-  const records = parseCSV(csvString);
-  const schoolsMap = new Map();
-  
-  records.forEach(record => {
-    const schoolName = record.School;
-    const departmentName = record.Department;
-    const courseName = record.Course;
-    
-    if (!schoolName || !departmentName || !courseName) return;
-    
-    if (!schoolsMap.has(schoolName)) {
-      schoolsMap.set(schoolName, new Map());
-    }
-    
-    const school = schoolsMap.get(schoolName);
-    
-    if (!school.has(departmentName)) {
-      school.set(departmentName, new Set());
-    }
-    
-    school.get(departmentName).add(courseName);
-  });
-  
-  // Convert to the expected structure
-  const schools = Array.from(schoolsMap.entries()).map(([schoolName, departments]) => {
     return {
+      id: uuidv4(),
       name: schoolName,
-      departments: Array.from(departments.entries()).map(([departmentName, courses]) => {
-        return {
-          name: departmentName,
-          courses: Array.from(courses).map(courseName => ({
-            name: courseName
-          }))
-        };
-      })
+      departments
     };
   });
   
-  return schools;
+  return parsedSchools;
 };
 
-/**
- * Parse CSV for teacher courses
- * Expected format: TeacherId,Course
- * @param csvString The CSV string to parse
- * @returns Array of teacher course mappings
- */
-export const parseTeacherCoursesCSV = (csvString: string) => {
-  const records = parseCSV(csvString);
-  const teacherCoursesMap = new Map();
+export const parseTeacherCoursesCSV = (csvContent: string): Record<string, string[]> => {
+  const lines = csvContent.trim().split("\n");
+  // Skip header row if it exists
+  const startIndex = lines[0].includes("Teacher,Course") ? 1 : 0;
   
-  records.forEach(record => {
-    const teacherId = record.TeacherId;
-    const course = record.Course;
-    
-    if (!teacherId || !course) return;
-    
-    if (!teacherCoursesMap.has(teacherId)) {
-      teacherCoursesMap.set(teacherId, new Set());
+  // Group courses by teacher
+  const teachersMap: Record<string, string[]> = {};
+  
+  for (let i = startIndex; i < lines.length; i++) {
+    const columns = lines[i].split(",");
+    if (columns.length >= 2) {
+      const teacherName = columns[0].trim();
+      const courseName = columns[1].trim();
+      
+      if (!teachersMap[teacherName]) {
+        teachersMap[teacherName] = [];
+      }
+      
+      if (courseName && !teachersMap[teacherName].includes(courseName)) {
+        teachersMap[teacherName].push(courseName);
+      }
     }
-    
-    teacherCoursesMap.get(teacherId).add(course);
-  });
+  }
   
-  // Convert to array of objects
-  return Array.from(teacherCoursesMap.entries()).map(([teacherId, courses]) => {
-    return {
-      teacherId,
-      courses: Array.from(courses)
-    };
-  });
+  return teachersMap;
 };
