@@ -1,392 +1,360 @@
-
-import { useState } from "react";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { useForm } from "react-hook-form";
-import * as z from "zod";
-import { Trash2, Edit, MoreHorizontal } from "lucide-react";
+import React, { useState, useEffect } from "react";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+  Table,
+  TableBody,
+  TableCaption,
+  TableCell,
+  TableFooter,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { useData } from "@/contexts/DataContext";
+import { Plus, Edit, Trash } from "lucide-react";
+import { toast } from "sonner";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   Form,
   FormControl,
+  FormDescription,
   FormField,
   FormItem,
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
-import { Input } from "@/components/ui/input";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { DataTable } from "@/components/DataTable";
-import PageHeader from "@/components/PageHeader";
-import { useData } from "@/contexts/DataContext";
-import { Badge } from "@/components/ui/badge";
-import { MultiSelect } from "@/components/MultiSelect";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import CSVUploader from "@/components/CSVUploader";
-import { parseTeacherCoursesCSV } from "@/utils/csvUtils";
-import type { Teacher } from "@/types";
+import { z } from "zod";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useForm } from "react-hook-form";
+import { Course, Teacher } from "@/types";
 
-// Form schema for adding a new teacher
 const formSchema = z.object({
   lastName: z.string().min(2, {
-    message: "Το επώνυμο πρέπει να είναι τουλάχιστον 2 χαρακτήρες.",
+    message: "Lastname must be at least 2 characters.",
   }),
   firstName: z.string().min(2, {
-    message: "Το όνομα πρέπει να είναι τουλάχιστον 2 χαρακτήρες.",
+    message: "Firstname must be at least 2 characters.",
   }),
-  contact: z.string().min(2, {
-    message: "Το τηλέφωνο είναι υποχρεωτικό.",
+  courses: z.array(z.string()).nonempty({
+    message: "Please select at least one course.",
   }),
-  courses: z.array(z.string()).min(1, {
-    message: "Επιλέξτε τουλάχιστον ένα μάθημα.",
+  contact: z.string().min(10, {
+    message: "Contact must be at least 10 characters.",
   }),
-  baseSalary: z.coerce.number().min(0).default(16),
-  studentBonus: z.coerce.number().min(0).default(1),
+  baseSalary: z.string().refine((value) => !isNaN(parseFloat(value)), {
+    message: "Base Salary must be a number.",
+  }),
+  studentBonus: z.string().refine((value) => !isNaN(parseFloat(value)), {
+    message: "Student Bonus must be a number.",
+  }),
 });
 
 const Teachers = () => {
-  const { teachers, courses, addTeacher, deleteTeacher, updateTeacher } = useData();
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
-  const [teacherToDelete, setTeacherToDelete] = useState<Teacher | null>(null);
+  const { teachers, addTeacher, updateTeacher, deleteTeacher, courses } = useData();
+  const [open, setOpen] = useState(false);
+  const [editMode, setEditMode] = useState(false);
+  const [selectedTeacherId, setSelectedTeacherId] = useState<string | null>(null);
+  const [selectedCourses, setSelectedCourses] = useState<string[]>([]);
 
-  // Get unique course names from all courses
-  const allCourseNames = [...new Set(courses.map((course) => course.name))];
-
-  // Initialize form
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
       lastName: "",
       firstName: "",
-      contact: "",
       courses: [],
-      baseSalary: 16,
-      studentBonus: 1,
+      contact: "",
+      baseSalary: "",
+      studentBonus: "",
     },
   });
 
-  // Handle form submission
-  const onSubmit = (values: z.infer<typeof formSchema>) => {
-    addTeacher(values);
-    setIsDialogOpen(false);
-    form.reset({
-      lastName: "",
-      firstName: "",
-      contact: "",
-      courses: [],
-      baseSalary: 16,
-      studentBonus: 1,
-    });
-  };
-
-  // Handle delete click
-  const handleDeleteClick = (teacher: Teacher) => {
-    setTeacherToDelete(teacher);
-    setIsDeleteDialogOpen(true);
-  };
-
-  // Confirm delete
-  const confirmDelete = () => {
-    if (teacherToDelete) {
-      deleteTeacher(teacherToDelete.id);
-      setIsDeleteDialogOpen(false);
-    }
-  };
-
-  // Handle teacher courses CSV upload
-  const handleTeacherCoursesCSVUpload = (csvContent: string) => {
-    const teacherCourses = parseTeacherCoursesCSV(csvContent);
-    
-    teacherCourses.forEach(({ teacherId, courses }) => {
-      const teacher = teachers.find(t => t.id === teacherId);
+  useEffect(() => {
+    if (selectedTeacherId) {
+      const teacher = teachers.find((t) => t.id === selectedTeacherId);
       if (teacher) {
-        // Merge existing courses with new ones
-        const updatedCourses = [...new Set([...teacher.courses, ...courses])];
-        updateTeacher(teacherId, { courses: updatedCourses });
+        form.setValue("lastName", teacher.lastName);
+        form.setValue("firstName", teacher.firstName);
+        form.setValue("courses", teacher.courses);
+        form.setValue("contact", teacher.contact);
+        form.setValue("baseSalary", teacher.baseSalary.toString());
+        form.setValue("studentBonus", teacher.studentBonus.toString());
+        setSelectedCourses(teacher.courses);
       }
-    });
+    } else {
+      form.reset();
+      setSelectedCourses([]);
+    }
+  }, [selectedTeacherId, teachers, form]);
+
+  const onSubmit = (values: z.infer<typeof formSchema>) => {
+    if (editMode && selectedTeacherId) {
+      // Update existing teacher
+      updateTeacher(selectedTeacherId, {
+        ...values,
+        baseSalary: parseFloat(values.baseSalary),
+        studentBonus: parseFloat(values.studentBonus),
+      });
+      toast.success("Teacher updated successfully!");
+    } else {
+      // Create new teacher
+      const newTeacher = {
+        lastName: values.lastName || "", // Ensure required property has a value (even if empty string)
+        firstName: values.firstName || "", // Ensure required property has a value
+        courses: values.courses || [], // Ensure required property has a value
+        contact: values.contact || "", // Ensure required property has a value
+        baseSalary: parseFloat(values.baseSalary) || 0, // Ensure required property has a value
+        studentBonus: parseFloat(values.studentBonus) || 0 // Ensure required property has a value
+      };
+      addTeacher(newTeacher);
+      toast.success("Teacher created successfully!");
+    }
+    setOpen(false);
+    setEditMode(false);
+    setSelectedTeacherId(null);
+    form.reset();
+    setSelectedCourses([]);
   };
 
-  // Data table columns
-  const columns = [
-    {
-      accessorKey: "lastName",
-      header: "Επώνυμο",
-    },
-    {
-      accessorKey: "firstName",
-      header: "Όνομα",
-    },
-    {
-      accessorKey: "contact",
-      header: "Επικοινωνία",
-    },
-    {
-      accessorKey: "courses",
-      header: "Μαθήματα",
-      cell: ({ row }: any) => {
-        const courses: string[] = row.getValue("courses");
-        return (
-          <div className="flex flex-wrap gap-1">
-            {courses.map((course) => (
-              <Badge key={course} variant="outline">
-                {course}
-              </Badge>
-            ))}
-          </div>
-        );
-      },
-    },
-    {
-      accessorKey: "baseSalary",
-      header: "Βασικός Μισθός",
-      cell: ({ row }: any) => {
-        return `${row.getValue("baseSalary") || 16}€`;
-      },
-    },
-    {
-      accessorKey: "studentBonus",
-      header: "Επίδομα/Φοιτητή",
-      cell: ({ row }: any) => {
-        return `${row.getValue("studentBonus") || 1}€`;
-      },
-    },
-    {
-      id: "actions",
-      cell: ({ row }: any) => {
-        const teacher = row.original;
-        return (
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" className="h-8 w-8 p-0">
-                <span className="sr-only">Μενού</span>
-                <MoreHorizontal className="h-4 w-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuLabel>Ενέργειες</DropdownMenuLabel>
-              <DropdownMenuItem onClick={() => console.log("Edit", teacher)}>
-                <Edit className="mr-2 h-4 w-4" />
-                Επεξεργασία
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                onClick={() => handleDeleteClick(teacher)}
-                className="text-destructive focus:text-destructive"
-              >
-                <Trash2 className="mr-2 h-4 w-4" />
-                Διαγραφή
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        );
-      },
-    },
-  ];
+  const handleEdit = (teacherId: string) => {
+    setSelectedTeacherId(teacherId);
+    setEditMode(true);
+    setOpen(true);
+  };
+
+  const handleDelete = (teacherId: string) => {
+    deleteTeacher(teacherId);
+    toast.success("Teacher deleted successfully!");
+  };
+
+  const courseOptions = courses.map((course) => ({
+    label: course.name,
+    value: course.id,
+  }));
 
   return (
     <div>
-      <PageHeader
-        title="Καθηγητές"
-        description="Διαχείριση καθηγητών και των μαθημάτων τους"
-        action={{
-          label: "Νέος Καθηγητής",
-          onClick: () => setIsDialogOpen(true),
-        }}
-      />
+      <Card>
+        <CardHeader>
+          <CardTitle>Διαχείριση Καθηγητών</CardTitle>
+          <CardDescription>
+            Διαχειριστείτε τους καθηγητές του φροντιστηρίου σας.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Button onClick={() => {
+            setOpen(true);
+            setEditMode(false);
+            setSelectedTeacherId(null);
+            form.reset();
+            setSelectedCourses([]);
+          }}>
+            <Plus className="mr-2 h-4 w-4" />
+            Προσθήκη Καθηγητή
+          </Button>
 
-      <Tabs defaultValue="list" className="w-full">
-        <TabsList className="mb-4">
-          <TabsTrigger value="list">Λίστα Καθηγητών</TabsTrigger>
-          <TabsTrigger value="import">Εισαγωγή Μαθημάτων</TabsTrigger>
-        </TabsList>
-        
-        <TabsContent value="list">
-          <DataTable
-            columns={columns}
-            data={teachers}
-            searchKey="lastName"
-            searchPlaceholder="Αναζήτηση με επώνυμο..."
-          />
-        </TabsContent>
-        
-        <TabsContent value="import" className="space-y-6">
-          <CSVUploader
-            title="Εισαγωγή Μαθημάτων Καθηγητών"
-            description="Ανεβάστε ένα αρχείο CSV με αντιστοιχίσεις καθηγητών και μαθημάτων"
-            onUpload={handleTeacherCoursesCSVUpload}
-            acceptedFormat="Μορφή: TeacherId,Course (κάθε γραμμή αντιστοιχεί σε ένα μάθημα ενός καθηγητή)"
-          />
-          
-          <div className="p-4 border rounded-md bg-muted/50">
-            <h3 className="font-medium mb-2">Παράδειγμα αρχείου CSV:</h3>
-            <pre className="text-sm bg-background p-2 rounded">
-              TeacherId,Course<br />
-              {teachers.length > 0 ? `${teachers[0].id},Αλγόριθμοι` : "abc123,Αλγόριθμοι"}<br />
-              {teachers.length > 0 ? `${teachers[0].id},Βάσεις Δεδομένων` : "abc123,Βάσεις Δεδομένων"}<br />
-              {teachers.length > 1 ? `${teachers[1].id},Άλγεβρα` : "def456,Άλγεβρα"}
-            </pre>
-          </div>
-        </TabsContent>
-      </Tabs>
+          <Table className="mt-4">
+            <TableHeader>
+              <TableRow>
+                <TableHead>Όνομα</TableHead>
+                <TableHead>Επώνυμο</TableHead>
+                <TableHead>Μαθήματα</TableHead>
+                <TableHead>Επικοινωνία</TableHead>
+                <TableHead>Βασικός Μισθός</TableHead>
+                <TableHead>Μπόνους Φοιτητή</TableHead>
+                <TableHead className="text-right">Ενέργειες</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {teachers.map((teacher) => (
+                <TableRow key={teacher.id}>
+                  <TableCell>{teacher.firstName}</TableCell>
+                  <TableCell>{teacher.lastName}</TableCell>
+                  <TableCell>{teacher.courses.join(", ")}</TableCell>
+                  <TableCell>{teacher.contact}</TableCell>
+                  <TableCell>{teacher.baseSalary}</TableCell>
+                  <TableCell>{teacher.studentBonus}</TableCell>
+                  <TableCell className="text-right">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleEdit(teacher.id)}
+                    >
+                      <Edit className="mr-2 h-4 w-4" />
+                      Επεξεργασία
+                    </Button>
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button variant="ghost" size="sm" className="text-red-500">
+                          <Trash className="mr-2 h-4 w-4" />
+                          Διαγραφή
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Είστε σίγουρος/η?</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            Αυτή η ενέργεια είναι μη αναστρέψιμη.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Ακύρωση</AlertDialogCancel>
+                          <AlertDialogAction onClick={() => handleDelete(teacher.id)}>
+                            Διαγραφή
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
 
-      {/* Add Teacher Dialog */}
-      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="sm:max-w-[550px]">
-          <DialogHeader>
-            <DialogTitle>Προσθήκη Νέου Καθηγητή</DialogTitle>
-            <DialogDescription>
-              Συμπληρώστε τα στοιχεία του καθηγητή και τα μαθήματα που διδάσκει.
-            </DialogDescription>
-          </DialogHeader>
-
+      <AlertDialog open={open} onOpenChange={setOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{editMode ? "Επεξεργασία Καθηγητή" : "Προσθήκη Καθηγητή"}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {editMode
+                ? "Επεξεργαστείτε τα στοιχεία του καθηγητή."
+                : "Εισάγετε τα στοιχεία του νέου καθηγητή."}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <FormField
-                  control={form.control}
-                  name="lastName"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Επώνυμο</FormLabel>
-                      <FormControl>
-                        <Input {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="firstName"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Όνομα</FormLabel>
-                      <FormControl>
-                        <Input {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-
               <FormField
                 control={form.control}
-                name="contact"
+                name="firstName"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Τηλέφωνο / Email</FormLabel>
+                    <FormLabel>Όνομα</FormLabel>
                     <FormControl>
-                      <Input {...field} />
+                      <Input placeholder="Όνομα" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
               />
-
-              <div className="grid grid-cols-2 gap-4">
-                <FormField
-                  control={form.control}
-                  name="baseSalary"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Βασικός Μισθός (Χ)</FormLabel>
-                      <FormControl>
-                        <Input type="number" min="0" step="0.5" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="studentBonus"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Επίδομα/Φοιτητή (Υ)</FormLabel>
-                      <FormControl>
-                        <Input type="number" min="0" step="0.5" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-
+              <FormField
+                control={form.control}
+                name="lastName"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Επώνυμο</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Επώνυμο" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
               <FormField
                 control={form.control}
                 name="courses"
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Μαθήματα</FormLabel>
+                    <Select
+                      multiple
+                      onValueChange={(value) => {
+                        field.onChange(value);
+                        setSelectedCourses(value);
+                      }}
+                      defaultValue={selectedCourses}
+                    >
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Επιλέξτε μαθήματα" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {courses.map((course) => (
+                          <SelectItem key={course.id} value={course.id}>
+                            {course.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="contact"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Επικοινωνία</FormLabel>
                     <FormControl>
-                      <MultiSelect
-                        options={allCourseNames.map((course) => ({
-                          label: course,
-                          value: course,
-                        }))}
-                        selected={field.value}
-                        onChange={field.onChange}
-                        placeholder="Επιλέξτε μαθήματα..."
-                      />
+                      <Input placeholder="Τηλέφωνο" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
               />
-
-              <DialogFooter>
-                <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>
-                  Ακύρωση
-                </Button>
-                <Button type="submit">Αποθήκευση</Button>
-              </DialogFooter>
+              <FormField
+                control={form.control}
+                name="baseSalary"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Βασικός Μισθός</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Βασικός Μισθός" type="number" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="studentBonus"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Μπόνους Φοιτητή</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Μπόνους Φοιτητή" type="number" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <AlertDialogFooter>
+                <AlertDialogCancel>Ακύρωση</AlertDialogCancel>
+                <Button type="submit">{editMode ? "Ενημέρωση" : "Αποθήκευση"}</Button>
+              </AlertDialogFooter>
             </form>
           </Form>
-        </DialogContent>
-      </Dialog>
-
-      {/* Delete confirmation dialog */}
-      <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Επιβεβαίωση Διαγραφής</DialogTitle>
-            <DialogDescription>
-              Είστε βέβαιοι ότι θέλετε να διαγράψετε τον καθηγητή{" "}
-              <span className="font-medium">
-                {teacherToDelete
-                  ? `${teacherToDelete.lastName} ${teacherToDelete.firstName}`
-                  : ""}
-              </span>
-              ?
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsDeleteDialogOpen(false)}>
-              Ακύρωση
-            </Button>
-            <Button variant="destructive" onClick={confirmDelete}>
-              Διαγραφή
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };

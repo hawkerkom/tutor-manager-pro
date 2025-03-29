@@ -8,15 +8,15 @@ import { ArrowUpRight, Users, BookOpen, Receipt, GraduationCap } from "lucide-re
 
 const Dashboard = () => {
   const navigate = useNavigate();
-  const { students, classes, teacherClasses, expenses, statisticsData } = useData();
+  const { students, classes, teacherClasses, expenses, statistics } = useData();
 
   // Quick stats for the dashboard
   const totalStudents = students.length;
   const totalClasses = classes.length;
-  const totalRevenue = statisticsData.revenue.monthly;
-  const totalExpenses = statisticsData.expenses.monthly;
-  const pendingPayments = statisticsData.studentBalances;
-  const pendingTeacherPayments = statisticsData.teacherBalances;
+  const totalRevenue = statistics.revenue.monthly;
+  const totalExpenses = statistics.expenses.monthly;
+  const pendingPayments = statistics.studentBalances;
+  const pendingTeacherPayments = statistics.teacherBalances;
   
   // Calculate revenue by week for the chart (mock data for now)
   const revenueData = [
