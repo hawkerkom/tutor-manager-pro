@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { format } from "date-fns";
@@ -34,7 +33,7 @@ const Students = () => {
   const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
 
   const handleAddStudent = () => {
-    navigate("/register");
+    navigate("/register-student");
   };
 
   const handleViewStudent = (student: Student) => {
@@ -43,7 +42,6 @@ const Students = () => {
   };
 
   const handleEditStudent = (student: Student) => {
-    // TODO: Implement edit functionality
     console.log("Edit student:", student);
   };
 
@@ -143,7 +141,6 @@ const Students = () => {
         searchPlaceholder="Αναζήτηση με επίθετο..."
       />
 
-      {/* Delete confirmation dialog */}
       <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
         <DialogContent>
           <DialogHeader>
@@ -170,7 +167,6 @@ const Students = () => {
         </DialogContent>
       </Dialog>
 
-      {/* View student dialog */}
       <Dialog open={isViewDialogOpen} onOpenChange={setIsViewDialogOpen}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
