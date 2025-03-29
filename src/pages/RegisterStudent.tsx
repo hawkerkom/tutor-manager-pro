@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -62,7 +61,6 @@ const RegisterStudent = () => {
     { label: string; value: string; id: string }[]
   >([]);
 
-  // Initialize form
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -76,14 +74,12 @@ const RegisterStudent = () => {
     },
   });
 
-  // Handle school selection
   const handleSchoolChange = (value: string) => {
     setSelectedSchool(value);
     form.setValue("school", value);
     form.setValue("department", ""); // Reset department
     form.setValue("interestedCourses", []); // Reset courses
 
-    // Find school and get departments
     const school = schools.find((s) => s.name === value);
     if (school) {
       const departments = school.departments.map((dept) => ({
@@ -97,11 +93,9 @@ const RegisterStudent = () => {
     setCourseOptions([]);
   };
 
-  // Handle department selection
   const handleDepartmentChange = (value: string) => {
     form.setValue("department", value);
     
-    // Find school and department to get courses
     const school = schools.find((s) => s.name === selectedSchool);
     if (school) {
       const department = school.departments.find((d) => d.name === value);
@@ -116,10 +110,19 @@ const RegisterStudent = () => {
     }
   };
 
-  // Handle form submission
   const onSubmit = (values: z.infer<typeof formSchema>) => {
-    addStudent(values);
-    toast.success("Ο φοιτητής καταχωρήθηκε επιτυχώς!");
+    const studentData: Omit<Student, "id" | "createdAt"> = {
+      lastName: values.lastName,
+      firstName: values.firstName,
+      school: values.school,
+      department: values.department,
+      phone: values.phone,
+      email: values.email,
+      interestedCourses: values.interestedCourses
+    };
+    
+    addStudent(studentData);
+    toast.success("Ο φοιτητής καταχωρήθηκε επιτυχής!");
     navigate("/students");
   };
 

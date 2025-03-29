@@ -53,6 +53,7 @@ interface DataContextType {
   deleteExpense: (id: string) => void;
   deleteCourse: (id: string) => void;
   uploadCourses: (csvData: string) => void;
+  uploadTeacherCourses: (csvData: string) => void;
   refreshStatistics: () => void;
   calculateTeacherRate: (teacherId: string, studentsCount: number) => number;
 }
@@ -488,6 +489,79 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  const uploadTeacherCourses = (csvData: string) => {
+    try {
+      const lines = csvData.split('\n');
+      const updatedTeachers = [...teachers];
+      let updatedCount = 0;
+      let newTeacherCount = 0;
+      
+      const startIndex = lines[0].includes('Teacher') || lines[0].includes('Καθηγητής') || 
+                        lines[0].includes('LastName') || lines[0].includes('Επώνυμο') ? 1 : 0;
+      
+      for (let i = startIndex; i < lines.length; i++) {
+        const line = lines[i].trim();
+        if (!line) continue;
+        
+        const parts = line.split(',').map(s => s.trim());
+        
+        if (parts.length >= 3) { // Τουλάχιστον επώνυμο, όνομα και 1 μάθημα
+          const lastName = parts[0];
+          const firstName = parts[1];
+          const teacherCourses = parts.slice(2).filter(c => c.length > 0);
+          const baseSalary = 16; // Default values
+          const studentBonus = 1; // Default values
+        
+          if (lastName && firstName && teacherCourses.length > 0) {
+            // Αναζήτηση υπάρχοντος καθηγητή με το ίδιο επώνυμο και όνομα
+            let teacherIndex = updatedTeachers.findIndex(
+              t => t.lastName.toLowerCase() === lastName.toLowerCase() && 
+                   t.firstName.toLowerCase() === firstName.toLowerCase()
+            );
+            
+            if (teacherIndex !== -1) {
+              // Ενημέρωση μαθημάτων υπάρχοντος καθηγητή
+              const existingCourses = new Set(updatedTeachers[teacherIndex].courses);
+              for (const course of teacherCourses) {
+                existingCourses.add(course);
+              }
+              updatedTeachers[teacherIndex].courses = Array.from(existingCourses);
+              updatedCount++;
+            } else {
+              // Προσθήκη νέου καθηγητή
+              updatedTeachers.push({
+                id: uuidv4(),
+                lastName,
+                firstName,
+                courses: teacherCourses,
+                contact: "",
+                baseSalary,
+                studentBonus
+              });
+              newTeacherCount++;
+            }
+          }
+        }
+      }
+      
+      setTeachers(updatedTeachers);
+      saveToLocalStorage('teachers', updatedTeachers);
+      
+      if (newTeacherCount > 0 && updatedCount > 0) {
+        toast.success(`Προστέθηκαν ${newTeacherCount} νέοι καθηγητές και ενημερώθηκαν ${updatedCount}`);
+      } else if (newTeacherCount > 0) {
+        toast.success(`Προστέθηκαν ${newTeacherCount} νέοι καθηγητές`);
+      } else if (updatedCount > 0) {
+        toast.success(`Ενημερώθηκαν τα μαθήματα για ${updatedCount} καθηγητές`);
+      } else {
+        toast.info(`Δεν έγιναν αλλαγές`);
+      }
+    } catch (error) {
+      console.error('Error parsing CSV:', error);
+      toast.error('Σφάλμα κατά την εισαγωγή του αρχείου CSV');
+    }
+  };
+
   return (
     <DataContext.Provider value={{
       students,
@@ -517,6 +591,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       deleteExpense,
       deleteCourse,
       uploadCourses,
+      uploadTeacherCourses,
       refreshStatistics,
       calculateTeacherRate
     }}>

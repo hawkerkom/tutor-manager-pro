@@ -1,17 +1,10 @@
 
-import { useState } from "react";
-import { MoreHorizontal, Trash2, Edit, Plus } from "lucide-react";
+import { useState, useRef } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import * as z from "zod";
+import { Trash2, Edit, MoreHorizontal, Upload, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import {
   Dialog,
   DialogContent,
@@ -29,55 +22,53 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { Checkbox } from "@/components/ui/checkbox";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { DataTable } from "@/components/DataTable";
 import PageHeader from "@/components/PageHeader";
 import { useData } from "@/contexts/DataContext";
+import { Badge } from "@/components/ui/badge";
+import { MultiSelect } from "@/components/MultiSelect";
+import { toast } from "sonner";
 import type { Teacher } from "@/types";
 
-// Form schema for adding/editing teachers
+// Form schema for adding a new teacher
 const formSchema = z.object({
   lastName: z.string().min(2, {
-    message: "Το επίθετο πρέπει να έχει τουλάχιστον 2 χαρακτήρες.",
+    message: "Το επώνυμο πρέπει να είναι τουλάχιστον 2 χαρακτήρες.",
   }),
   firstName: z.string().min(2, {
-    message: "Το όνομα πρέπει να έχει τουλάχιστον 2 χαρακτήρες.",
+    message: "Το όνομα πρέπει να είναι τουλάχιστον 2 χαρακτήρες.",
   }),
-  contact: z.string().min(10, {
-    message: "Παρακαλώ εισάγετε ένα έγκυρο αριθμό τηλεφώνου.",
+  contact: z.string().min(2, {
+    message: "Το τηλέφωνο είναι υποχρεωτικό.",
   }),
   courses: z.array(z.string()).min(1, {
     message: "Επιλέξτε τουλάχιστον ένα μάθημα.",
   }),
-  baseSalary: z.coerce.number().min(0, {
-    message: "Ο βασικός μισθός πρέπει να είναι θετικός αριθμός.",
-  }).default(16),
-  studentBonus: z.coerce.number().min(0, {
-    message: "Το επίδομα ανά φοιτητή πρέπει να είναι θετικός αριθμός.",
-  }).default(1),
+  baseSalary: z.coerce.number().min(0).default(16),
+  studentBonus: z.coerce.number().min(0).default(1),
 });
 
 const Teachers = () => {
-  const { teachers, courses, addTeacher, updateTeacher, deleteTeacher } = useData();
-  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
-  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const { teachers, courses, addTeacher, deleteTeacher, uploadTeacherCourses } = useData();
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isUploadDialogOpen, setIsUploadDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
-  const [selectedTeacher, setSelectedTeacher] = useState<Teacher | null>(null);
+  const [teacherToDelete, setTeacherToDelete] = useState<Teacher | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [csvContent, setCsvContent] = useState<string>("");
 
-  // Group courses by school and department
-  const groupedCourses: Record<string, Record<string, string[]>> = {};
-  courses.forEach(course => {
-    if (!groupedCourses[course.school]) {
-      groupedCourses[course.school] = {};
-    }
-    if (!groupedCourses[course.school][course.department]) {
-      groupedCourses[course.school][course.department] = [];
-    }
-    groupedCourses[course.school][course.department].push(course.name);
-  });
+  // Get unique course names from all courses
+  const allCourseNames = [...new Set(courses.map((course) => course.name))];
 
-  // Initialize add form
-  const addForm = useForm<z.infer<typeof formSchema>>({
+  // Initialize form
+  const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
       lastName: "",
@@ -89,73 +80,76 @@ const Teachers = () => {
     },
   });
 
-  // Initialize edit form
-  const editForm = useForm<z.infer<typeof formSchema>>({
-    resolver: zodResolver(formSchema),
-    defaultValues: {
-      lastName: "",
-      firstName: "",
-      contact: "",
-      courses: [],
-      baseSalary: 16,
-      studentBonus: 1,
-    },
-  });
-
-  // Handle add form submission
-  const onAddSubmit = (values: z.infer<typeof formSchema>) => {
-    addTeacher(values);
-    setIsAddDialogOpen(false);
-    addForm.reset();
-  };
-
-  // Handle edit form submission
-  const onEditSubmit = (values: z.infer<typeof formSchema>) => {
-    if (selectedTeacher) {
-      updateTeacher(selectedTeacher.id, values);
-      setIsEditDialogOpen(false);
-    }
-  };
-
-  // Handle edit click
-  const handleEditClick = (teacher: Teacher) => {
-    setSelectedTeacher(teacher);
+  // Handle form submission
+  const onSubmit = (values: z.infer<typeof formSchema>) => {
+    // Διόρθωση του σφάλματος προσθέτοντας όλα τα απαιτούμενα πεδία
+    const teacherData: Omit<Teacher, "id"> = {
+      lastName: values.lastName,
+      firstName: values.firstName,
+      contact: values.contact,
+      courses: values.courses,
+      baseSalary: values.baseSalary,
+      studentBonus: values.studentBonus
+    };
     
-    // Populate edit form with teacher data
-    editForm.reset({
-      lastName: teacher.lastName,
-      firstName: teacher.firstName,
-      contact: teacher.contact,
-      courses: teacher.courses,
-      baseSalary: teacher.baseSalary || 16,
-      studentBonus: teacher.studentBonus || 1,
+    addTeacher(teacherData);
+    setIsDialogOpen(false);
+    form.reset({
+      lastName: "",
+      firstName: "",
+      contact: "",
+      courses: [],
+      baseSalary: 16,
+      studentBonus: 1,
     });
-    
-    setIsEditDialogOpen(true);
+  };
+
+  // Handle CSV file upload
+  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const content = e.target?.result as string;
+        setCsvContent(content);
+      };
+      reader.readAsText(file);
+    }
+  };
+
+  // Handle CSV data upload
+  const handleCsvUpload = () => {
+    if (csvContent) {
+      uploadTeacherCourses(csvContent);
+      setIsUploadDialogOpen(false);
+      setCsvContent("");
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
+    } else {
+      toast.error("Παρακαλώ επιλέξτε ένα αρχείο CSV πρώτα.");
+    }
   };
 
   // Handle delete click
   const handleDeleteClick = (teacher: Teacher) => {
-    setSelectedTeacher(teacher);
+    setTeacherToDelete(teacher);
     setIsDeleteDialogOpen(true);
   };
 
   // Confirm delete
   const confirmDelete = () => {
-    if (selectedTeacher) {
-      deleteTeacher(selectedTeacher.id);
+    if (teacherToDelete) {
+      deleteTeacher(teacherToDelete.id);
       setIsDeleteDialogOpen(false);
     }
   };
-
-  // Extract all unique course names
-  const allCourses = Array.from(new Set(courses.map(course => course.name)));
 
   // Data table columns
   const columns = [
     {
       accessorKey: "lastName",
-      header: "Επίθετο",
+      header: "Επώνυμο",
     },
     {
       accessorKey: "firstName",
@@ -169,24 +163,28 @@ const Teachers = () => {
       accessorKey: "courses",
       header: "Μαθήματα",
       cell: ({ row }: any) => {
-        const coursesList = row.getValue("courses") as string[];
+        const courses: string[] = row.getValue("courses");
         return (
-          <div className="max-w-[200px] truncate">
-            {coursesList.join(", ")}
+          <div className="flex flex-wrap gap-1">
+            {courses.map((course) => (
+              <Badge key={course} variant="outline">
+                {course}
+              </Badge>
+            ))}
           </div>
         );
       },
     },
     {
       accessorKey: "baseSalary",
-      header: "Βασικός Μισθός (X)",
+      header: "Βασικός Μισθός",
       cell: ({ row }: any) => {
         return `${row.getValue("baseSalary") || 16}€`;
       },
     },
     {
       accessorKey: "studentBonus",
-      header: "Επίδομα/Φοιτητή (Y)",
+      header: "Επίδομα/Φοιτητή",
       cell: ({ row }: any) => {
         return `${row.getValue("studentBonus") || 1}€`;
       },
@@ -205,7 +203,7 @@ const Teachers = () => {
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               <DropdownMenuLabel>Ενέργειες</DropdownMenuLabel>
-              <DropdownMenuItem onClick={() => handleEditClick(teacher)}>
+              <DropdownMenuItem onClick={() => console.log("Edit", teacher)}>
                 <Edit className="mr-2 h-4 w-4" />
                 Επεξεργασία
               </DropdownMenuItem>
@@ -227,41 +225,48 @@ const Teachers = () => {
     <div>
       <PageHeader
         title="Καθηγητές"
-        description="Διαχείριση καταχωρημένων καθηγητών"
-        action={{
-          label: "Νέος Καθηγητής",
-          onClick: () => setIsAddDialogOpen(true),
-        }}
+        description="Διαχείριση καθηγητών και των μαθημάτων τους"
       />
+
+      <div className="flex justify-end space-x-2 mb-4">
+        <Button variant="outline" onClick={() => setIsUploadDialogOpen(true)}>
+          <Upload className="mr-2 h-4 w-4" />
+          Εισαγωγή από CSV
+        </Button>
+        <Button onClick={() => setIsDialogOpen(true)}>
+          <Plus className="mr-2 h-4 w-4" />
+          Νέος Καθηγητής
+        </Button>
+      </div>
 
       <DataTable
         columns={columns}
         data={teachers}
         searchKey="lastName"
-        searchPlaceholder="Αναζήτηση με επίθετο..."
+        searchPlaceholder="Αναζήτηση με επώνυμο..."
       />
 
       {/* Add Teacher Dialog */}
-      <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-        <DialogContent className="sm:max-w-[600px]">
+      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+        <DialogContent className="sm:max-w-[550px]">
           <DialogHeader>
             <DialogTitle>Προσθήκη Νέου Καθηγητή</DialogTitle>
             <DialogDescription>
-              Συμπληρώστε τα στοιχεία του νέου καθηγητή.
+              Συμπληρώστε τα στοιχεία του καθηγητή και τα μαθήματα που διδάσκει.
             </DialogDescription>
           </DialogHeader>
 
-          <Form {...addForm}>
-            <form onSubmit={addForm.handleSubmit(onAddSubmit)} className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
                 <FormField
-                  control={addForm.control}
+                  control={form.control}
                   name="lastName"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Επίθετο</FormLabel>
+                      <FormLabel>Επώνυμο</FormLabel>
                       <FormControl>
-                        <Input placeholder="Παπαδόπουλος" {...field} />
+                        <Input {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -269,13 +274,13 @@ const Teachers = () => {
                 />
 
                 <FormField
-                  control={addForm.control}
+                  control={form.control}
                   name="firstName"
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Όνομα</FormLabel>
                       <FormControl>
-                        <Input placeholder="Γιώργος" {...field} />
+                        <Input {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -284,26 +289,26 @@ const Teachers = () => {
               </div>
 
               <FormField
-                control={addForm.control}
+                control={form.control}
                 name="contact"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Τηλέφωνο Επικοινωνίας</FormLabel>
+                    <FormLabel>Τηλέφωνο / Email</FormLabel>
                     <FormControl>
-                      <Input placeholder="69XXXXXXXX" {...field} />
+                      <Input {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
               />
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-2 gap-4">
                 <FormField
-                  control={addForm.control}
+                  control={form.control}
                   name="baseSalary"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Βασικός Μισθός (X) €/ώρα</FormLabel>
+                      <FormLabel>Βασικός Μισθός (Χ) σε €</FormLabel>
                       <FormControl>
                         <Input 
                           type="number" 
@@ -318,16 +323,16 @@ const Teachers = () => {
                 />
 
                 <FormField
-                  control={addForm.control}
+                  control={form.control}
                   name="studentBonus"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Επίδομα ανά Φοιτητή (Y) €</FormLabel>
+                      <FormLabel>Επίδομα ανά Φοιτητή (Υ) σε €</FormLabel>
                       <FormControl>
                         <Input 
                           type="number" 
                           min="0" 
-                          step="0.5"
+                          step="0.25"
                           {...field} 
                         />
                       </FormControl>
@@ -338,57 +343,29 @@ const Teachers = () => {
               </div>
 
               <FormField
-                control={addForm.control}
+                control={form.control}
                 name="courses"
-                render={() => (
+                render={({ field }) => (
                   <FormItem>
-                    <div className="mb-4">
-                      <FormLabel>Μαθήματα Διδασκαλίας</FormLabel>
-                    </div>
-                    <div className="max-h-[200px] overflow-y-auto border rounded-md p-4">
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                        {allCourses.map((course) => (
-                          <FormField
-                            key={course}
-                            control={addForm.control}
-                            name="courses"
-                            render={({ field }) => {
-                              return (
-                                <FormItem
-                                  key={course}
-                                  className="flex flex-row items-start space-x-3 space-y-0"
-                                >
-                                  <FormControl>
-                                    <Checkbox
-                                      checked={field.value?.includes(course)}
-                                      onCheckedChange={(checked) => {
-                                        return checked
-                                          ? field.onChange([...field.value, course])
-                                          : field.onChange(
-                                              field.value?.filter(
-                                                (value) => value !== course
-                                              )
-                                            );
-                                      }}
-                                    />
-                                  </FormControl>
-                                  <FormLabel className="font-normal">
-                                    {course}
-                                  </FormLabel>
-                                </FormItem>
-                              );
-                            }}
-                          />
-                        ))}
-                      </div>
-                    </div>
+                    <FormLabel>Μαθήματα</FormLabel>
+                    <FormControl>
+                      <MultiSelect
+                        options={allCourseNames.map((name) => ({
+                          value: name,
+                          label: name,
+                        }))}
+                        selected={field.value}
+                        onChange={field.onChange}
+                        placeholder="Επιλέξτε μαθήματα"
+                      />
+                    </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
               />
 
               <DialogFooter>
-                <Button type="button" variant="outline" onClick={() => setIsAddDialogOpen(false)}>
+                <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>
                   Ακύρωση
                 </Button>
                 <Button type="submit">Αποθήκευση</Button>
@@ -398,160 +375,59 @@ const Teachers = () => {
         </DialogContent>
       </Dialog>
 
-      {/* Edit Teacher Dialog */}
-      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-        <DialogContent className="sm:max-w-[600px]">
+      {/* Upload CSV Dialog */}
+      <Dialog open={isUploadDialogOpen} onOpenChange={setIsUploadDialogOpen}>
+        <DialogContent className="sm:max-w-[550px]">
           <DialogHeader>
-            <DialogTitle>Επεξεργασία Καθηγητή</DialogTitle>
+            <DialogTitle>Εισαγωγή Καθηγητών και Μαθημάτων από CSV</DialogTitle>
             <DialogDescription>
-              Τροποποιήστε τα στοιχεία του καθηγητή.
+              Ανεβάστε ένα αρχείο CSV με τους καθηγητές και τα μαθήματά τους. Το αρχείο πρέπει να έχει την εξής μορφή:
+              Επώνυμο, Όνομα, Μάθημα1, Μάθημα2, Μάθημα3, ...
             </DialogDescription>
           </DialogHeader>
 
-          <Form {...editForm}>
-            <form onSubmit={editForm.handleSubmit(onEditSubmit)} className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <FormField
-                  control={editForm.control}
-                  name="lastName"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Επίθετο</FormLabel>
-                      <FormControl>
-                        <Input {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={editForm.control}
-                  name="firstName"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Όνομα</FormLabel>
-                      <FormControl>
-                        <Input {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-
-              <FormField
-                control={editForm.control}
-                name="contact"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Τηλέφωνο Επικοινωνίας</FormLabel>
-                    <FormControl>
-                      <Input {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
+          <div className="space-y-4">
+            <div className="border rounded-md p-4">
+              <input
+                type="file"
+                accept=".csv"
+                onChange={handleFileUpload}
+                ref={fileInputRef}
+                className="w-full"
               />
+            </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <FormField
-                  control={editForm.control}
-                  name="baseSalary"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Βασικός Μισθός (X) €/ώρα</FormLabel>
-                      <FormControl>
-                        <Input 
-                          type="number" 
-                          min="0" 
-                          step="0.5"
-                          {...field} 
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={editForm.control}
-                  name="studentBonus"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Επίδομα ανά Φοιτητή (Y) €</FormLabel>
-                      <FormControl>
-                        <Input 
-                          type="number" 
-                          min="0" 
-                          step="0.5"
-                          {...field} 
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+            {csvContent && (
+              <div className="border rounded-md p-4 max-h-[200px] overflow-y-auto">
+                <h3 className="font-semibold mb-2">Προεπισκόπηση:</h3>
+                <pre className="text-xs whitespace-pre-wrap">
+                  {csvContent}
+                </pre>
               </div>
+            )}
 
-              <FormField
-                control={editForm.control}
-                name="courses"
-                render={() => (
-                  <FormItem>
-                    <div className="mb-4">
-                      <FormLabel>Μαθήματα Διδασκαλίας</FormLabel>
-                    </div>
-                    <div className="max-h-[200px] overflow-y-auto border rounded-md p-4">
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                        {allCourses.map((course) => (
-                          <FormField
-                            key={course}
-                            control={editForm.control}
-                            name="courses"
-                            render={({ field }) => {
-                              return (
-                                <FormItem
-                                  key={course}
-                                  className="flex flex-row items-start space-x-3 space-y-0"
-                                >
-                                  <FormControl>
-                                    <Checkbox
-                                      checked={field.value?.includes(course)}
-                                      onCheckedChange={(checked) => {
-                                        return checked
-                                          ? field.onChange([...field.value, course])
-                                          : field.onChange(
-                                              field.value?.filter(
-                                                (value) => value !== course
-                                              )
-                                            );
-                                      }}
-                                    />
-                                  </FormControl>
-                                  <FormLabel className="font-normal">
-                                    {course}
-                                  </FormLabel>
-                                </FormItem>
-                              );
-                            }}
-                          />
-                        ))}
-                      </div>
-                    </div>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+            <div className="text-sm text-muted-foreground">
+              <p>Παράδειγμα CSV αρχείου:</p>
+              <code className="text-xs">
+                Παπαδόπουλος, Γιώργος, Αλγόριθμοι, Δομές Δεδομένων, Προγραμματισμός<br />
+                Αντωνίου, Μαρία, Βάσεις Δεδομένων, Δίκτυα<br />
+                Γεωργίου, Νίκος, Μαθηματικά, Φυσική
+              </code>
+            </div>
 
-              <DialogFooter>
-                <Button type="button" variant="outline" onClick={() => setIsEditDialogOpen(false)}>
-                  Ακύρωση
-                </Button>
-                <Button type="submit">Αποθήκευση</Button>
-              </DialogFooter>
-            </form>
-          </Form>
+            <DialogFooter>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setIsUploadDialogOpen(false)}
+              >
+                Ακύρωση
+              </Button>
+              <Button onClick={handleCsvUpload} disabled={!csvContent}>
+                Εισαγωγή
+              </Button>
+            </DialogFooter>
+          </div>
         </DialogContent>
       </Dialog>
 
@@ -561,9 +437,9 @@ const Teachers = () => {
           <DialogHeader>
             <DialogTitle>Επιβεβαίωση Διαγραφής</DialogTitle>
             <DialogDescription>
-              Είστε βέβαιοι ότι θέλετε να διαγράψετε τον καθηγητή:{" "}
+              Είστε βέβαιοι ότι θέλετε να διαγράψετε τον/την καθηγητή/τρια{" "}
               <span className="font-medium">
-                {selectedTeacher?.lastName} {selectedTeacher?.firstName}
+                {teacherToDelete?.lastName} {teacherToDelete?.firstName}
               </span>
               ?
             </DialogDescription>

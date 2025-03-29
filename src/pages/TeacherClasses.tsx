@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { format } from "date-fns";
 import { el } from "date-fns/locale";
@@ -46,7 +45,6 @@ import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import type { TeacherClass } from "@/types";
 
-// Form schema for adding a new teacher class
 const formSchema = z.object({
   teacherId: z.string({
     required_error: "Παρακαλώ επιλέξτε καθηγητή.",
@@ -81,7 +79,6 @@ const TeacherClasses = () => {
   const [selectedTeacherCourses, setSelectedTeacherCourses] = useState<string[]>([]);
   const [useFormula, setUseFormula] = useState(true);
 
-  // Initialize form
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -95,13 +92,11 @@ const TeacherClasses = () => {
     },
   });
 
-  // Get the selected teacher
   const getSelectedTeacherDetails = () => {
     const teacherId = form.watch("teacherId");
     return teachers.find(t => t.id === teacherId);
   };
 
-  // Calculate current rate based on formula or fixed value
   const calculateCurrentRate = () => {
     const teacherId = form.watch("teacherId");
     const studentsCount = form.watch("studentsCount") || 0;
@@ -114,22 +109,19 @@ const TeacherClasses = () => {
     }
   };
 
-  // Handle teacher selection to update available courses
   const handleTeacherChange = (value: string) => {
     setSelectedTeacher(value);
     form.setValue("teacherId", value);
     
-    // Find teacher and update available courses
     const teacher = teachers.find(t => t.id === value);
     if (teacher) {
       setSelectedTeacherCourses(teacher.courses);
-      form.setValue("course", ""); // Reset course selection
+      form.setValue("course", "");
     } else {
       setSelectedTeacherCourses([]);
     }
   };
 
-  // Handle calculation method change
   const handleCalculationMethodChange = (value: "fixed" | "formula") => {
     form.setValue("calculationMethod", value);
     setUseFormula(value === "formula");
@@ -139,45 +131,39 @@ const TeacherClasses = () => {
       const studentsCount = form.getValues("studentsCount") || 0;
       
       if (teacherId) {
-        // Calculate and set the rate based on formula
         const calculatedRate = calculateTeacherRate(teacherId, studentsCount);
         form.setValue("ratePerHour", calculatedRate);
       }
     }
   };
 
-  // Handle students count change
   const handleStudentsCountChange = (value: number) => {
     form.setValue("studentsCount", value);
     
     if (form.watch("calculationMethod") === "formula") {
       const teacherId = form.getValues("teacherId");
       if (teacherId) {
-        // Recalculate rate based on new students count
         const calculatedRate = calculateTeacherRate(teacherId, value);
         form.setValue("ratePerHour", calculatedRate);
       }
     }
   };
 
-  // Calculate total during form changes
   const calculateTotal = () => {
     const hours = form.watch("hours") || 0;
     const rate = calculateCurrentRate();
     return hours * rate;
   };
 
-  // Get teacher name by ID
   const getTeacherName = (id: string) => {
     const teacher = teachers.find(t => t.id === id);
     return teacher ? `${teacher.lastName} ${teacher.firstName}` : "";
   };
 
-  // Handle form submission
   const onSubmit = (values: z.infer<typeof formSchema>) => {
     const teacherName = getTeacherName(values.teacherId);
     
-    const newTeacherClass = {
+    const newTeacherClass: Omit<TeacherClass, "id" | "totalDue" | "balance"> = {
       teacherId: values.teacherId,
       teacherName,
       course: values.course,
@@ -185,6 +171,9 @@ const TeacherClasses = () => {
       hours: values.hours,
       studentsCount: values.studentsCount,
       calculationMethod: values.calculationMethod,
+      ratePerHour: values.calculationMethod === "formula" 
+        ? calculateTeacherRate(values.teacherId, values.studentsCount)
+        : (values.ratePerHour || 25),
       amountPaid: values.amountPaid
     };
     
@@ -193,13 +182,11 @@ const TeacherClasses = () => {
     form.reset();
   };
 
-  // Handle delete click
   const handleDeleteClick = (classItem: TeacherClass) => {
     setClassToDelete(classItem);
     setIsDeleteDialogOpen(true);
   };
 
-  // Confirm delete
   const confirmDelete = () => {
     if (classToDelete) {
       deleteTeacherClass(classToDelete.id);
@@ -207,7 +194,6 @@ const TeacherClasses = () => {
     }
   };
 
-  // Data table columns
   const columns = [
     {
       accessorKey: "date",
@@ -311,7 +297,6 @@ const TeacherClasses = () => {
         searchPlaceholder="Αναζήτηση με όνομα καθηγητή..."
       />
 
-      {/* Add TeacherClass Dialog */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent className="sm:max-w-[600px]">
           <DialogHeader>
@@ -537,7 +522,6 @@ const TeacherClasses = () => {
         </DialogContent>
       </Dialog>
 
-      {/* Delete confirmation dialog */}
       <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
         <DialogContent>
           <DialogHeader>

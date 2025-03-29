@@ -96,7 +96,14 @@ const Courses = () => {
 
   // Handle add form submission
   const onSubmit = (values: z.infer<typeof formSchema>) => {
-    addCourse(values);
+    // Διορθώνουμε το πρόβλημα τύπων εδώ - βεβαιωνόμαστε ότι όλα τα απαιτούμενα πεδία υπάρχουν
+    const courseData: Omit<Course, "id"> = {
+      school: values.school,
+      department: values.department,
+      name: values.name
+    };
+    
+    addCourse(courseData);
     setIsAddDialogOpen(false);
     form.reset();
   };

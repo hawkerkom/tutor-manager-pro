@@ -1,7 +1,4 @@
-
 import { useState } from "react";
-import { format } from "date-fns";
-import { el } from "date-fns/locale";
 import { MoreHorizontal, Trash2, Edit } from "lucide-react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
@@ -30,6 +27,7 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
@@ -37,62 +35,48 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
+import { Calendar } from "@/components/ui/calendar";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { cn } from "@/lib/utils";
+import { CalendarIcon } from "@radix-ui/react-icons";
+import { format } from "date-fns";
 import { DataTable } from "@/components/DataTable";
-import { DatePickerWithPresets } from "@/components/DatePickerWithPresets";
 import PageHeader from "@/components/PageHeader";
 import { useData } from "@/contexts/DataContext";
 import type { Expense } from "@/types";
+import { toast } from "sonner";
 
-// Form schema for adding/editing expenses
+// Form schema for adding a new expense
 const formSchema = z.object({
   date: z.date({
-    required_error: "Παρακαλώ επιλέξτε ημερομηνία.",
+    required_error: "Απαιτείται ημερομηνία.",
   }),
   description: z.string().min(2, {
     message: "Η περιγραφή πρέπει να έχει τουλάχιστον 2 χαρακτήρες.",
   }),
-  category: z.string({
-    required_error: "Παρακαλώ επιλέξτε κατηγορία.",
+  category: z.string().min(1, {
+    message: "Παρακαλώ επιλέξτε κατηγορία.",
   }),
-  amount: z.coerce.number().min(0.01, {
+  amount: z.coerce.number().gt(0, {
     message: "Το ποσό πρέπει να είναι μεγαλύτερο από 0.",
   }),
-  paymentMethod: z.string({
-    required_error: "Παρακαλώ επιλέξτε τρόπο πληρωμής.",
+  paymentMethod: z.string().min(1, {
+    message: "Παρακαλώ επιλέξτε μέθοδο πληρωμής.",
   }),
 });
 
 const Expenses = () => {
-  const { expenses, addExpense, updateExpense, deleteExpense } = useData();
-  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
-  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const { expenses, addExpense, deleteExpense } = useData();
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
-  const [selectedExpense, setSelectedExpense] = useState<Expense | null>(null);
+  const [expenseToDelete, setExpenseToDelete] = useState<Expense | null>(null);
 
-  // Expense categories
-  const categories = [
-    { value: "rent", label: "Ενοίκιο" },
-    { value: "utilities", label: "Λογαριασμοί" },
-    { value: "supplies", label: "Υλικά" },
-    { value: "salaries", label: "Μισθοδοσία" },
-    { value: "marketing", label: "Διαφήμιση" },
-    { value: "maintenance", label: "Συντήρηση" },
-    { value: "taxes", label: "Φόροι" },
-    { value: "other", label: "Άλλο" },
-  ];
-
-  // Payment methods
-  const paymentMethods = [
-    { value: "cash", label: "Μετρητά" },
-    { value: "card", label: "Κάρτα" },
-    { value: "transfer", label: "Τραπεζική Μεταφορά" },
-    { value: "check", label: "Επιταγή" },
-  ];
-
-  // Initialize add form
-  const addForm = useForm<z.infer<typeof formSchema>>({
+  // Initialize form
+  const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
       date: new Date(),
@@ -103,73 +87,34 @@ const Expenses = () => {
     },
   });
 
-  // Initialize edit form
-  const editForm = useForm<z.infer<typeof formSchema>>({
-    resolver: zodResolver(formSchema),
-    defaultValues: {
-      date: new Date(),
-      description: "",
-      category: "",
-      amount: 0,
-      paymentMethod: "",
-    },
-  });
-
-  // Handle add form submission
-  const onAddSubmit = (values: z.infer<typeof formSchema>) => {
-    addExpense(values);
-    setIsAddDialogOpen(false);
-    addForm.reset();
-  };
-
-  // Handle edit form submission
-  const onEditSubmit = (values: z.infer<typeof formSchema>) => {
-    if (selectedExpense) {
-      updateExpense(selectedExpense.id, values);
-      setIsEditDialogOpen(false);
-    }
-  };
-
-  // Handle edit click
-  const handleEditClick = (expense: Expense) => {
-    setSelectedExpense(expense);
+  // Handle form submission
+  const onSubmit = (values: z.infer<typeof formSchema>) => {
+    // Διορθώνουμε το πρόβλημα τύπων εδώ - βεβαιωνόμαστε ότι όλα τα απαιτούμενα πεδία υπάρχουν
+    const expenseData: Omit<Expense, "id"> = {
+      date: values.date,
+      paymentMethod: values.paymentMethod,
+      description: values.description,
+      category: values.category,
+      amount: values.amount
+    };
     
-    // Populate edit form with expense data
-    editForm.reset({
-      date: new Date(expense.date),
-      description: expense.description,
-      category: expense.category,
-      amount: expense.amount,
-      paymentMethod: expense.paymentMethod,
-    });
-    
-    setIsEditDialogOpen(true);
+    addExpense(expenseData);
+    setIsDialogOpen(false);
+    form.reset();
   };
 
   // Handle delete click
   const handleDeleteClick = (expense: Expense) => {
-    setSelectedExpense(expense);
+    setExpenseToDelete(expense);
     setIsDeleteDialogOpen(true);
   };
 
   // Confirm delete
   const confirmDelete = () => {
-    if (selectedExpense) {
-      deleteExpense(selectedExpense.id);
+    if (expenseToDelete) {
+      deleteExpense(expenseToDelete.id);
       setIsDeleteDialogOpen(false);
     }
-  };
-
-  // Get category label by value
-  const getCategoryLabel = (value: string) => {
-    const category = categories.find(cat => cat.value === value);
-    return category ? category.label : value;
-  };
-
-  // Get payment method label by value
-  const getPaymentMethodLabel = (value: string) => {
-    const method = paymentMethods.find(m => m.value === value);
-    return method ? method.label : value;
   };
 
   // Data table columns
@@ -179,7 +124,7 @@ const Expenses = () => {
       header: "Ημερομηνία",
       cell: ({ row }: any) => {
         const date = new Date(row.getValue("date"));
-        return format(date, "dd/MM/yyyy", { locale: el });
+        return format(date, "dd/MM/yyyy");
       },
     },
     {
@@ -189,23 +134,17 @@ const Expenses = () => {
     {
       accessorKey: "category",
       header: "Κατηγορία",
-      cell: ({ row }: any) => {
-        return getCategoryLabel(row.getValue("category"));
-      },
     },
     {
       accessorKey: "amount",
       header: "Ποσό",
       cell: ({ row }: any) => {
-        return `${row.getValue("amount")}€`;
+        return `${row.getValue("amount")} €`;
       },
     },
     {
       accessorKey: "paymentMethod",
-      header: "Τρόπος Πληρωμής",
-      cell: ({ row }: any) => {
-        return getPaymentMethodLabel(row.getValue("paymentMethod"));
-      },
+      header: "Μέθοδος Πληρωμής",
     },
     {
       id: "actions",
@@ -221,7 +160,7 @@ const Expenses = () => {
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               <DropdownMenuLabel>Ενέργειες</DropdownMenuLabel>
-              <DropdownMenuItem onClick={() => handleEditClick(expense)}>
+              <DropdownMenuItem onClick={() => console.log("Edit", expense)}>
                 <Edit className="mr-2 h-4 w-4" />
                 Επεξεργασία
               </DropdownMenuItem>
@@ -241,273 +180,151 @@ const Expenses = () => {
 
   return (
     <div>
-      <PageHeader
-        title="Έξοδα"
-        description="Καταχώρηση και διαχείριση εξόδων του φροντιστηρίου"
-        action={{
-          label: "Νέο Έξοδο",
-          onClick: () => setIsAddDialogOpen(true),
-        }}
-      />
+      <PageHeader title="Έξοδα" description="Καταγραφή εξόδων" />
 
-      <DataTable
-        columns={columns}
-        data={expenses}
-        searchKey="description"
-        searchPlaceholder="Αναζήτηση με περιγραφή..."
-      />
+      <div className="flex justify-end mb-4">
+        <Button onClick={() => setIsDialogOpen(true)}>
+          Προσθήκη Εξόδου
+        </Button>
+      </div>
+
+      <DataTable columns={columns} data={expenses} searchKey="description" searchPlaceholder="Αναζήτηση περιγραφής..." />
 
       {/* Add Expense Dialog */}
-      <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-        <DialogContent className="sm:max-w-[550px]">
+      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+        <DialogContent className="sm:max-w-[500px]">
           <DialogHeader>
-            <DialogTitle>Καταχώρηση Νέου Εξόδου</DialogTitle>
+            <DialogTitle>Προσθήκη Νέου Εξόδου</DialogTitle>
             <DialogDescription>
-              Συμπληρώστε τα στοιχεία του νέου εξόδου.
+              Συμπληρώστε τα στοιχεία του εξόδου.
             </DialogDescription>
           </DialogHeader>
 
-          <Form {...addForm}>
-            <form onSubmit={addForm.handleSubmit(onAddSubmit)} className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <FormField
-                  control={addForm.control}
-                  name="date"
-                  render={({ field }) => (
-                    <FormItem className="flex flex-col">
-                      <FormLabel>Ημερομηνία</FormLabel>
-                      <DatePickerWithPresets
-                        date={field.value}
-                        setDate={field.onChange}
-                      />
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={addForm.control}
-                  name="category"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Κατηγορία</FormLabel>
-                      <Select
-                        onValueChange={field.onChange}
-                        defaultValue={field.value}
-                      >
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+              <FormField
+                control={form.control}
+                name="date"
+                render={({ field }) => (
+                  <FormItem className="flex flex-col">
+                    <FormLabel>Ημερομηνία</FormLabel>
+                    <Popover>
+                      <PopoverTrigger asChild>
                         <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Επιλέξτε κατηγορία" />
-                          </SelectTrigger>
+                          <Button
+                            variant={"outline"}
+                            className={cn(
+                              "w-[240px] pl-3 text-left font-normal",
+                              !field.value && "text-muted-foreground"
+                            )}
+                          >
+                            {field.value ? (
+                              format(field.value, "dd/MM/yyyy")
+                            ) : (
+                              <span>Επιλέξτε ημερομηνία</span>
+                            )}
+                            <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                          </Button>
                         </FormControl>
-                        <SelectContent>
-                          {categories.map((category) => (
-                            <SelectItem key={category.value} value={category.value}>
-                              {category.label}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="start">
+                        <Calendar
+                          mode="single"
+                          selected={field.value}
+                          onSelect={field.onChange}
+                          disabled={(date) =>
+                            date > new Date()
+                          }
+                          initialFocus
+                        />
+                      </PopoverContent>
+                    </Popover>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
 
               <FormField
-                control={addForm.control}
+                control={form.control}
                 name="description"
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Περιγραφή</FormLabel>
                     <FormControl>
-                      <Textarea
-                        placeholder="Περιγραφή εξόδου..."
-                        className="resize-none"
-                        {...field}
-                      />
+                      <Input placeholder="π.χ. Ενοίκιο" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
               />
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <FormField
-                  control={addForm.control}
-                  name="amount"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Ποσό (€)</FormLabel>
-                      <FormControl>
-                        <Input type="number" step="0.01" min="0.01" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={addForm.control}
-                  name="paymentMethod"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Τρόπος Πληρωμής</FormLabel>
-                      <Select
-                        onValueChange={field.onChange}
-                        defaultValue={field.value}
-                      >
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Επιλέξτε τρόπο" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {paymentMethods.map((method) => (
-                            <SelectItem key={method.value} value={method.value}>
-                              {method.label}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-
-              <DialogFooter>
-                <Button type="button" variant="outline" onClick={() => setIsAddDialogOpen(false)}>
-                  Ακύρωση
-                </Button>
-                <Button type="submit">Αποθήκευση</Button>
-              </DialogFooter>
-            </form>
-          </Form>
-        </DialogContent>
-      </Dialog>
-
-      {/* Edit Expense Dialog */}
-      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-        <DialogContent className="sm:max-w-[550px]">
-          <DialogHeader>
-            <DialogTitle>Επεξεργασία Εξόδου</DialogTitle>
-            <DialogDescription>
-              Τροποποιήστε τα στοιχεία του εξόδου.
-            </DialogDescription>
-          </DialogHeader>
-
-          <Form {...editForm}>
-            <form onSubmit={editForm.handleSubmit(onEditSubmit)} className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <FormField
-                  control={editForm.control}
-                  name="date"
-                  render={({ field }) => (
-                    <FormItem className="flex flex-col">
-                      <FormLabel>Ημερομηνία</FormLabel>
-                      <DatePickerWithPresets
-                        date={field.value}
-                        setDate={field.onChange}
-                      />
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={editForm.control}
-                  name="category"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Κατηγορία</FormLabel>
-                      <Select
-                        onValueChange={field.onChange}
-                        defaultValue={field.value}
-                      >
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Επιλέξτε κατηγορία" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {categories.map((category) => (
-                            <SelectItem key={category.value} value={category.value}>
-                              {category.label}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-
               <FormField
-                control={editForm.control}
-                name="description"
+                control={form.control}
+                name="category"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Περιγραφή</FormLabel>
+                    <FormLabel>Κατηγορία</FormLabel>
+                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Επιλέξτε κατηγορία" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="rent">Ενοίκιο</SelectItem>
+                        <SelectItem value="utilities">Λογαριασμοί</SelectItem>
+                        <SelectItem value="supplies">Προμήθειες</SelectItem>
+                        <SelectItem value="other">Άλλο</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="amount"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Ποσό</FormLabel>
                     <FormControl>
-                      <Textarea
-                        placeholder="Περιγραφή εξόδου..."
-                        className="resize-none"
-                        {...field}
-                      />
+                      <Input type="number" placeholder="0.00" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
               />
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <FormField
-                  control={editForm.control}
-                  name="amount"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Ποσό (€)</FormLabel>
+              <FormField
+                control={form.control}
+                name="paymentMethod"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Μέθοδος Πληρωμής</FormLabel>
+                    <Select onValueChange={field.onChange} defaultValue={field.value}>
                       <FormControl>
-                        <Input type="number" step="0.01" min="0.01" {...field} />
+                        <SelectTrigger>
+                          <SelectValue placeholder="Επιλέξτε μέθοδο πληρωμής" />
+                        </SelectTrigger>
                       </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={editForm.control}
-                  name="paymentMethod"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Τρόπος Πληρωμής</FormLabel>
-                      <Select
-                        onValueChange={field.onChange}
-                        defaultValue={field.value}
-                      >
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Επιλέξτε τρόπο" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {paymentMethods.map((method) => (
-                            <SelectItem key={method.value} value={method.value}>
-                              {method.label}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
+                      <SelectContent>
+                        <SelectItem value="cash">Μετρητά</SelectItem>
+                        <SelectItem value="bankTransfer">Τραπεζική Μεταφορά</SelectItem>
+                        <SelectItem value="creditCard">Πιστωτική Κάρτα</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
 
               <DialogFooter>
-                <Button type="button" variant="outline" onClick={() => setIsEditDialogOpen(false)}>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setIsDialogOpen(false)}
+                >
                   Ακύρωση
                 </Button>
                 <Button type="submit">Αποθήκευση</Button>
@@ -523,13 +340,9 @@ const Expenses = () => {
           <DialogHeader>
             <DialogTitle>Επιβεβαίωση Διαγραφής</DialogTitle>
             <DialogDescription>
-              Είστε βέβαιοι ότι θέλετε να διαγράψετε το έξοδο:{" "}
+              Είστε βέβαιοι ότι θέλετε να διαγράψετε το έξοδο με περιγραφή{" "}
               <span className="font-medium">
-                {selectedExpense?.description}
-              </span>{" "}
-              με ποσό{" "}
-              <span className="font-medium">
-                {selectedExpense?.amount}€
+                {expenseToDelete?.description}
               </span>
               ?
             </DialogDescription>
