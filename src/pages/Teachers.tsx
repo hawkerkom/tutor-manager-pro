@@ -54,6 +54,7 @@ import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { Course, Teacher } from "@/types";
+import { MultiSelect } from "@/components/MultiSelect";
 
 const formSchema = z.object({
   lastName: z.string().min(2, {
@@ -115,7 +116,6 @@ const Teachers = () => {
 
   const onSubmit = (values: z.infer<typeof formSchema>) => {
     if (editMode && selectedTeacherId) {
-      // Update existing teacher
       updateTeacher(selectedTeacherId, {
         ...values,
         baseSalary: parseFloat(values.baseSalary),
@@ -123,7 +123,6 @@ const Teachers = () => {
       });
       toast.success("Teacher updated successfully!");
     } else {
-      // Create new teacher
       const newTeacher = {
         lastName: values.lastName || "", 
         firstName: values.firstName || "", 
@@ -218,7 +217,7 @@ const Teachers = () => {
                       </AlertDialogTrigger>
                       <AlertDialogContent>
                         <AlertDialogHeader>
-                          <AlertDialogTitle>Είστε σίγουρος/η?</AlertDialogTitle>
+                          <AlertDialogTitle>Είστε σίγουρ��ς/η?</AlertDialogTitle>
                           <AlertDialogDescription>
                             Αυτή η ενέργεια είναι μη αναστρέψιμη.
                           </AlertDialogDescription>
@@ -283,27 +282,14 @@ const Teachers = () => {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Μαθήματα</FormLabel>
-                    <Select
-                      onValueChange={(value) => {
-                        const valueArray = Array.isArray(value) ? value : [value];
-                        field.onChange(valueArray);
-                        setSelectedCourses(valueArray);
-                      }}
-                      defaultValue={selectedCourses}
-                    >
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Επιλέξτε μαθήματα" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {courses.map((course) => (
-                          <SelectItem key={course.id} value={course.id}>
-                            {course.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <FormControl>
+                      <MultiSelect
+                        options={courseOptions}
+                        selected={field.value}
+                        onChange={field.onChange}
+                        placeholder="Επιλέξτε μαθήματα"
+                      />
+                    </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}

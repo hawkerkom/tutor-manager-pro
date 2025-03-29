@@ -194,7 +194,10 @@ const Classes = () => {
 
               <div>
                 <Label htmlFor="paymentStatus">Κατάσταση Πληρωμής</Label>
-                <Select value={paymentStatus} onValueChange={setPaymentStatus}>
+                <Select 
+                  value={paymentStatus} 
+                  onValueChange={(value: "pending" | "paid" | "partial") => setPaymentStatus(value)}
+                >
                   <SelectTrigger className="w-full">
                     <SelectValue placeholder="Επιλέξτε κατάσταση" />
                   </SelectTrigger>
